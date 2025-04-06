@@ -1,0 +1,150 @@
+<div class="property-details-container" *ngIf="property">
+  <div class="property-header">
+    <h1>{{ property.address }}</h1>
+    <p class="price">{{ property.price }}</p>
+  </div>
+
+  <div class="property-specs">
+    <div class="spec-item">
+      <span class="label">Beds</span>
+      <span class="value">{{ property.beds }}</span>
+    </div>
+    <div class="spec-item">
+      <span class="label">Baths</span>
+      <span class="value">{{ property.baths }}</span>
+    </div>
+    <div class="spec-item">
+      <span class="label">Square Feet</span>
+      <span class="value">{{ property.sqft }}</span>
+    </div>
+    <div class="spec-item">
+      <span class="label">Lot Size</span>
+      <span class="value">{{ property.lotSize }}</span>
+    </div>
+    <div class="spec-item">
+      <span class="label">Year Built</span>
+      <span class="value">{{ property.yearBuilt }}</span>
+    </div>
+    <div class="spec-item">
+      <span class="label">Property Type</span>
+      <span class="value">{{ property.propertyType }}</span>
+    </div>
+    <div class="spec-item">
+      <span class="label">Listing Status</span>
+      <span class="value">{{ property.listingStatus }}</span>
+    </div>
+    <div class="spec-item">
+      <span class="label">Days on Market</span>
+      <span class="value">{{ property.daysOnMarket }}</span>
+    </div>
+    <div class="spec-item">
+      <span class="label">Price per Sqft</span>
+      <span class="value">{{ property.pricePerSqft }}</span>
+    </div>
+  </div>
+
+  <div class="property-history">
+    <h2>Property History</h2>
+    <div class="history-item">
+      <span class="label">Last Sold Date</span>
+      <span class="value">{{ property.lastSoldDate }}</span>
+    </div>
+    <div class="history-item">
+      <span class="label">Last Sold Price</span>
+      <span class="value">{{ property.lastSoldPrice }}</span>
+    </div>
+  </div>
+
+  <div class="property-valuations">
+    <h2>Valuations</h2>
+    <div class="valuation-item">
+      <span class="label">Zestimate</span>
+      <span class="value">{{ property.zestimate }}</span>
+    </div>
+    <div class="valuation-item">
+      <span class="label">Rent Zestimate</span>
+      <span class="value">{{ property.rentZestimate }}</span>
+    </div>
+  </div>
+
+  <div class="property-description">
+    <h2>Description</h2>
+    <p>{{ property.description }}</p>
+  </div>
+
+  <div class="property-location">
+    <h2>Location</h2>
+    <div class="location-item">
+      <span class="label">Latitude</span>
+      <span class="value">{{ property.latitude }}</span>
+    </div>
+    <div class="location-item">
+      <span class="label">Longitude</span>
+      <span class="value">{{ property.longitude }}</span>
+    </div>
+  </div>
+
+  <!-- Listing Information -->
+  <div class="listing-info" *ngIf="property!.listingAgent || property!.listingOffice">
+    <h3>Listing Information</h3>
+    
+    <!-- Listing Agent -->
+    <div class="info-section" *ngIf="property!.listingAgent.name !== 'N/A'">
+      <h4>Listing Agent</h4>
+      <div class="info-grid">
+        <div class="info-item" *ngIf="property!.listingAgent.name !== 'N/A'">
+          <span class="label">Name:</span>
+          <span class="value">{{ property!.listingAgent.name }}</span>
+        </div>
+        <div class="info-item" *ngIf="property!.listingAgent.phone !== 'N/A'">
+          <span class="label">Phone:</span>
+          <a [href]="'tel:' + property!.listingAgent.phone" class="value link">{{ property!.listingAgent.phone }}</a>
+        </div>
+        <div class="info-item" *ngIf="property!.listingAgent.email !== 'N/A'">
+          <span class="label">Email:</span>
+          <a [href]="'mailto:' + property!.listingAgent.email" class="value link">{{ property!.listingAgent.email }}</a>
+        </div>
+        <div class="info-item" *ngIf="property!.listingAgent.website !== 'N/A'">
+          <span class="label">Website:</span>
+          <a [href]="property!.listingAgent.website" target="_blank" class="value link">Visit Website</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Listing Office -->
+    <div class="info-section" *ngIf="property!.listingOffice.name !== 'N/A'">
+      <h4>Listing Office</h4>
+      <div class="info-grid">
+        <div class="info-item" *ngIf="property!.listingOffice.name !== 'N/A'">
+          <span class="label">Name:</span>
+          <span class="value">{{ property!.listingOffice.name }}</span>
+        </div>
+        <div class="info-item" *ngIf="property!.listingOffice.phone !== 'N/A'">
+          <span class="label">Phone:</span>
+          <a [href]="'tel:' + property!.listingOffice.phone" class="value link">{{ property!.listingOffice.phone }}</a>
+        </div>
+        <div class="info-item" *ngIf="property!.listingOffice.email !== 'N/A'">
+          <span class="label">Email:</span>
+          <a [href]="'mailto:' + property!.listingOffice.email" class="value link">{{ property!.listingOffice.email }}</a>
+        </div>
+      </div>
+    </div>
+
+    <!-- MLS Information -->
+    <div class="info-section" *ngIf="property!.mlsNumber !== 'N/A' || property!.mlsName !== 'N/A'">
+      <h4>MLS Information</h4>
+      <div class="info-grid">
+        <div class="info-item" *ngIf="property!.mlsNumber !== 'N/A'">
+          <span class="label">MLS Number:</span>
+          <span class="value">{{ property!.mlsNumber }}</span>
+        </div>
+        <div class="info-item" *ngIf="property!.mlsName !== 'N/A'">
+          <span class="label">MLS Name:</span>
+          <span class="value">{{ property!.mlsName }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button class="back-button" (click)="goBack()">Back to Chat</button>
+</div> 
