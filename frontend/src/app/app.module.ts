@@ -7,12 +7,14 @@ import { AppRoutingModule } from './app-routing.module';
 import { AppComponent } from './app.component';
 import { ChatComponent } from './chat/chat.component';
 import { PropertyDetailsComponent } from './property-details/property-details.component';
+import { HomeComponent } from './home/home.component';
 
 @NgModule({
   declarations: [
     AppComponent,
     ChatComponent,
-    PropertyDetailsComponent
+    PropertyDetailsComponent,
+    HomeComponent
   ],
   imports: [
     BrowserModule,
