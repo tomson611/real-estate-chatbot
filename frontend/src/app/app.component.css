@@ -1,0 +1,10 @@
+.main-content {
+  padding-top: 60px; /* Height of navbar */
+  min-height: calc(100vh - 60px);
+  background-color: #f8f9fa;
+}
+
+:host {
+  display: block;
+  min-height: 100vh;
+} 

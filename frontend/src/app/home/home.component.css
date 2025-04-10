@@ -53,6 +53,7 @@
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
   text-align: center;
   transition: transform 0.3s ease;
+  position: relative;
 }
 
 .feature-card:hover {
@@ -71,6 +72,33 @@
 
 .feature-card p {
   color: #7f8c8d;
+}
+
+.coming-soon-section {
+  margin-bottom: 3rem;
+}
+
+.coming-soon-section h2 {
+  text-align: center;
+  color: #2c3e50;
+  margin-bottom: 2rem;
+}
+
+.feature-card.coming-soon {
+  opacity: 0.8;
+  filter: grayscale(20%);
+}
+
+.coming-soon-badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background-color: #3498db;
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.8rem;
+  font-weight: 500;
 }
 
 .how-it-works {
