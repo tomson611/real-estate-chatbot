@@ -1,4 +1,4 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Property } from '../models/property.interface';
@@ -20,7 +20,8 @@ interface ChatResponse {
   templateUrl: './chat.component.html',
   styleUrls: ['./chat.component.css']
 })
-export class ChatComponent implements OnInit {
+export class ChatComponent implements OnInit, AfterViewChecked {
+  @ViewChild('messagesContainer') private messagesContainer!: ElementRef;
   messages: Message[] = [];
   displayMessages: Message[] = [];
   newMessage: string = '';
@@ -37,9 +38,22 @@ export class ChatComponent implements OnInit {
     });
   }
 
+  ngAfterViewChecked() {
+    this.scrollToBottom();
+  }
+
+  scrollToBottom(): void {
+    try {
+      this.messagesContainer.nativeElement.scrollTop = this.messagesContainer.nativeElement.scrollHeight;
+    } catch(err) { }
+  }
+
   formatText(text: string): string {
     // First handle bold text
     text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+    
+    // Replace \n\n with actual newlines
+    text = text.replace(/\\n\\n/g, '\n\n');
     
     // Split into paragraphs first
     const paragraphs = text.split(/(?:\r?\n){2,}/);

@@ -98,6 +98,25 @@ When providing numbered lists in responses:
 2. Do not add extra line breaks between numbers
 3. Keep the formatting consistent throughout the response
 4. Use proper markdown formatting for lists
+
+When discussing prices or ranges:
+1. Always use the $ symbol before monetary values
+2. Use commas for thousands (e.g., $1,000,000)
+3. Keep price ranges on a single line
+4. Example: "Prices range from $800,000 to $2,000,000"
+
+When discussing neighborhoods or areas:
+1. Keep paragraphs concise and focused
+2. Use single line breaks between paragraphs
+3. Avoid excessive newlines
+4. Example format:
+   "Silver Lake is one of Los Angeles' most vibrant neighborhoods. Known for its arts scene and trendy cafes, it attracts young professionals and families alike. The area offers a mix of housing options:
+   
+   1. Single-Family Homes: $800,000 to $2,000,000
+   2. Condos and Townhouses: $400,000 to $1,000,000
+   3. Rental Prices: $2,500 to $3,500 per month
+   
+   Market conditions can change, so these prices may vary. Let me know if you'd like to explore specific properties in this area."
 """
 
 # OpenAI model configuration
@@ -503,6 +522,9 @@ Note: This calculation does not include property taxes, homeowners insurance, or
         response_text = re.sub(r'\n\n+', '\n\n', response_text)
         # Fix any extra spaces
         response_text = re.sub(r' +', ' ', response_text)
+        # Remove any JSON-like formatting
+        response_text = re.sub(r'^\s*{\s*"text"\s*:\s*"', '', response_text)
+        response_text = re.sub(r'"\s*}\s*$', '', response_text)
         
         return {
             "response": {

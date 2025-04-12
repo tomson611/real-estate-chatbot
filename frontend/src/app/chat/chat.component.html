@@ -1,5 +1,5 @@
 <div class="chat-container">
-  <div class="messages-container">
+  <div class="messages-container" #messagesContainer>
     <div *ngFor="let message of displayMessages" [class]="'message ' + message.role">
       <ng-container *ngIf="isPropertyListing(message.content)">
         <div [innerHTML]="getMessageText(message.content)" class="message-text"></div>
