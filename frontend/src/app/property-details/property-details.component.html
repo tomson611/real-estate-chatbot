@@ -3,7 +3,7 @@
     <h1>{{ property.address }}</h1>
     <p class="price">{{ property.price }}</p>
   </div>
-
+  <div *ngIf="property">
   <div class="property-specs">
     <div class="spec-item">
       <span class="label">Beds</span>
@@ -148,3 +148,4 @@
 
   <button class="back-button" (click)="goBack()">Back to Chat</button>
 </div> 
+</div>

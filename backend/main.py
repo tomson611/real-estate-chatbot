@@ -55,6 +55,34 @@ Once you have all this information:
 5. Keep responses concise and focused on the user's question.
 6. If you don't have access to real listings, be honest about it.
 
+For mortgage calculations:
+1. When a user asks about mortgage payments, collect the following information:
+   - Loan amount (or purchase price)
+   - Interest rate
+   - Loan term (in years)
+   - Down payment (if mentioned)
+2. Present the results in a clear, easy-to-understand format.
+3. ALWAYS include the $ symbol before monetary values.
+4. NEVER use any mathematical notation, formulas, or special characters.
+5. NEVER use LaTeX, $, \\[, \\], or any other mathematical symbols.
+6. Present numbers in plain text format only.
+7. Keep all text on a single line, do not split numbers across multiple lines.
+8. Include important context about what the calculation includes/excludes (e.g., property taxes, insurance, PMI).
+9. Example of correct format:
+   "Based on your inputs:
+   Loan Amount: $300,000
+   Interest Rate: 3%
+   Loan Term: 25 years
+   Down Payment: $0
+   
+   Your estimated monthly payment would be: $1,425.20
+   
+   Additional details:
+   Total payment over loan term: $427,560.00
+   Total interest paid: $127,560.00
+   
+   Note: This calculation does not include property taxes, homeowners insurance, or PMI if applicable."
+
 Additional guidelines:
 1. Always prioritize the user's needs and financial well-being.
 2. Be transparent about any limitations in your knowledge or data.
@@ -64,6 +92,12 @@ Additional guidelines:
 6. When discussing neighborhoods or areas, provide objective information about safety, schools, and amenities.
 7. If asked about investment potential, provide balanced information about risks and rewards.
 8. Always maintain professional and ethical standards in your responses.
+
+When providing numbered lists in responses:
+1. Use a single line break between items
+2. Do not add extra line breaks between numbers
+3. Keep the formatting consistent throughout the response
+4. Use proper markdown formatting for lists
 """
 
 # OpenAI model configuration
@@ -117,12 +151,6 @@ class ChatMessage(BaseModel):
 
 class ChatRequest(BaseModel):
     messages: List[ChatMessage]
-
-class MortgageRequest(BaseModel):
-    loan_amount: float = Field(..., gt=0)
-    interest_rate: float = Field(..., gt=0)
-    loan_term_years: int = Field(..., gt=0)
-    down_payment: Optional[float] = Field(0, ge=0)
 
 def get_rentcast_data(location: str, max_price: Optional[float] = None, property_type: Optional[str] = None, min_bathrooms: Optional[float] = None):
     """Fetch data from RentCast API with caching"""
@@ -337,6 +365,69 @@ async def chat(chat_request: ChatRequest, request: Request):
         if not last_user_message:
             raise HTTPException(status_code=400, detail="No user message found")
 
+        # Check if this is a mortgage calculation request
+        mortgage_pattern = r"(?:purchase price|loan amount)?\s*\$?(\d+(?:,\d{3})*(?:\.\d{2})?)\s*(?:interest rate|rate)\s*(\d+(?:\.\d+)?)%?\s*(?:loan|for)\s*(\d+)\s*(?:years?|yrs?)?"
+        mortgage_match = re.search(mortgage_pattern, last_user_message.content.lower())
+        
+        if mortgage_match:
+            try:
+                # Extract mortgage parameters
+                loan_amount = float(mortgage_match.group(1).replace(',', '')) if mortgage_match.group(1) else None
+                interest_rate = float(mortgage_match.group(2)) if mortgage_match.group(2) else None
+                loan_term = int(mortgage_match.group(3)) if mortgage_match.group(3) else None
+                
+                print(f"Extracted parameters - Loan: {loan_amount}, Rate: {interest_rate}, Term: {loan_term}")  # Debug log
+                
+                # If we have all required parameters, calculate the mortgage
+                if loan_amount and interest_rate and loan_term:
+                    result = calculate_mortgage_payment(loan_amount, interest_rate, loan_term)
+                    
+                    # Format the response with proper $ symbols
+                    response_text = f"""Based on your inputs:
+Loan Amount: ${loan_amount:,.2f}
+Interest Rate: {interest_rate}%
+Loan Term: {loan_term} years
+Down Payment: $0.00
+
+Your estimated monthly payment would be: ${result['monthly_payment']:,.2f}
+
+Additional details:
+Total payment over loan term: ${result['total_payment']:,.2f}
+Total interest paid: ${result['total_interest']:,.2f}
+
+Note: This calculation does not include property taxes, homeowners insurance, or PMI if applicable."""
+                    
+                    # Clean the response text without modifying the newlines
+                    response_text = re.sub(r'<[^>]+>', '', response_text)  # Remove HTML tags
+                    response_text = re.sub(r' +', ' ', response_text)  # Fix extra spaces
+                    
+                    return {
+                        "response": {
+                            "text": response_text,
+                            "properties": []
+                        }
+                    }
+                else:
+                    # If we don't have all parameters, ask for them
+                    return {
+                        "response": {
+                            "text": "I need more information to calculate your mortgage payment. Please provide:\n"
+                                   "1. The loan amount (or purchase price)\n"
+                                   "2. The interest rate\n"
+                                   "3. The loan term (in years)\n"
+                                   "4. Any down payment amount, if applicable",
+                            "properties": []
+                        }
+                    }
+            except Exception as e:
+                print(f"Error calculating mortgage: {str(e)}")
+                return {
+                    "response": {
+                        "text": "I encountered an error while calculating your mortgage payment. Please try again with the required information:\n\n1. The loan amount (or purchase price)\n2. The interest rate\n3. The loan term (in years)\n4. Any down payment amount, if applicable",
+                        "properties": []
+                    }
+                }
+
         # Extract location, price, property type, and bathrooms using regex
         location_pattern = r"(?:in|near|at|around|listings in|properties in|homes in)\s+([a-zA-Z\s]+?)(?:\s+under|\s+over|\s+below|\s+above|[?.!,]|$)|^(?:listings|properties|homes)\s+([a-zA-Z\s]+?)(?:\s+under|\s+over|\s+below|\s+above|[?.!,]|$)|(?:listings|properties|homes)\s+([a-zA-Z\s]+?)(?:\s+under|\s+over|\s+below|\s+above|[?.!,]|$)"
         price_pattern = r"(?:under|below|less than|maximum|max|up to)\s*\$?(\d+(?:,\d{3})*(?:\.\d{2})?)"
@@ -353,11 +444,22 @@ async def chat(chat_request: ChatRequest, request: Request):
         property_type = property_type_match.group(1).strip() if property_type_match else None
         min_bathrooms = float(bathrooms_match.group(1)) if bathrooms_match else None
 
-        # If we have a location, try to get property data
-        if location:
+        # Check if this is a property search request
+        is_property_search = any([
+            "listings" in last_user_message.content.lower(),
+            "properties" in last_user_message.content.lower(),
+            "homes" in last_user_message.content.lower(),
+            "houses" in last_user_message.content.lower(),
+            "for sale" in last_user_message.content.lower(),
+            "buy" in last_user_message.content.lower(),
+            "purchase" in last_user_message.content.lower()
+        ])
+
+        # If we have a location and it's a property search request, try to get property data
+        if location and is_property_search:
             try:
                 properties = get_rentcast_data(location, max_price, property_type, min_bathrooms)
-                if properties:
+                if properties and len(properties) > 0:
                     return {
                         "response": {
                             "text": "",
@@ -365,10 +467,11 @@ async def chat(chat_request: ChatRequest, request: Request):
                         }
                     }
                 else:
+                    # If no properties found, return a message and empty properties array
                     return {
                         "response": {
                             "text": "I couldn't find any properties matching your criteria. Would you like to try a different search?",
-                            "properties": []
+                            "properties": []  # Explicitly set to empty array
                         }
                     }
             except Exception as e:
@@ -376,11 +479,11 @@ async def chat(chat_request: ChatRequest, request: Request):
                 return {
                     "response": {
                         "text": "I encountered an error while searching for properties. Please try again later.",
-                        "properties": []
+                        "properties": []  # Explicitly set to empty array
                     }
                 }
 
-        # If no location or error, let GPT handle the response
+        # If no location or not a property search request, let GPT handle the response
         messages = [
             {"role": "system", "content": SYSTEM_MESSAGE},
             *[{"role": msg.role, "content": msg.content} for msg in chat_request.messages]
@@ -392,26 +495,23 @@ async def chat(chat_request: ChatRequest, request: Request):
             temperature=0.7
         )
         
+        # Clean and format the response text
+        response_text = response.choices[0].message.content
+        # Remove any HTML tags
+        response_text = re.sub(r'<[^>]+>', '', response_text)
+        # Fix any double newlines
+        response_text = re.sub(r'\n\n+', '\n\n', response_text)
+        # Fix any extra spaces
+        response_text = re.sub(r' +', ' ', response_text)
+        
         return {
             "response": {
-                "text": response.choices[0].message.content,
+                "text": response_text,
                 "properties": []
             }
         }
     except Exception as e:
         print(f"Error in chat endpoint: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/api/calculate-mortgage")
-async def calculate_mortgage(request: MortgageRequest):
-    try:
-        result = calculate_mortgage_payment(
-            request.loan_amount,
-            request.interest_rate,
-            request.loan_term_years
-        )
-        return result
-    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 def test_rentcast_api():

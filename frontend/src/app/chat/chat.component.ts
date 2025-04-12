@@ -97,7 +97,7 @@ export class ChatComponent implements OnInit {
     const payload = { messages: formattedMessages };
     console.log('Sending to backend:', payload);
 
-    this.http.post<ChatResponse>('http://localhost:8002/api/chat', payload)
+    this.http.post<ChatResponse>('http://127.0.0.1:8000/api/chat', payload)
       .subscribe({
         next: (response) => {
           console.log('Response from backend:', response);
@@ -137,7 +137,11 @@ export class ChatComponent implements OnInit {
 
   isPropertyListing(content: any): boolean {
     console.log('Checking if content is property listing:', content);
-    return content && typeof content === 'object' && 'properties' in content && Array.isArray(content.properties);
+    return content && 
+           typeof content === 'object' && 
+           'properties' in content && 
+           Array.isArray(content.properties) && 
+           content.properties.length > 0;
   }
 
   getMessageText(content: any): string {
