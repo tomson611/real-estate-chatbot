@@ -3,5 +3,5 @@ declare const API_URL: string;
 
 export const environment = {
   production: true,
-  apiUrl: 'https://real-estate-chatbot-backend.onrender.com/api'
+  apiUrl: 'https://real-estate-chatbot-q73e.onrender.com/api'
 }; 
