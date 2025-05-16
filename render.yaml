@@ -5,8 +5,20 @@ services:
     buildCommand: |
       cd frontend && \
       npm install && \
-      sed -i "s|API_URL_PLACEHOLDER|$API_URL|g" src/environments/environment.prod.ts && \
-      npm run build --prod
+      echo "Current API_URL: $API_URL" && \
+      # Create a temporary file with the API URL
+      echo "const API_URL = '$API_URL';" > src/api-url.ts && \
+      # Update the main.ts to import the API URL
+      sed -i '1i import "./api-url";' src/main.ts && \
+      # Build the application
+      npm run build --prod && \
+      # Clean up
+      rm src/api-url.ts && \
+      # Verify the build
+      echo "Checking built files for API URL:" && \
+      grep -r "apiUrl" dist/real-estate-chatbot-frontend/ && \
+      echo "Checking for localhost URLs:" && \
+      grep -r "127.0.0.1" dist/real-estate-chatbot-frontend/ || echo "No localhost URLs found"
     staticPublishPath: frontend/dist/real-estate-chatbot-frontend
     envVars:
       - key: NODE_VERSION
