@@ -1,4 +1,5 @@
 import { Injectable } from '@angular/core';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
@@ -7,8 +8,7 @@ export class ApiService {
   private apiUrl: string;
 
   constructor() {
-    // In production, this will be replaced during build
-    this.apiUrl = 'API_URL_PLACEHOLDER';
+    this.apiUrl = environment.apiUrl;
   }
 
   getApiUrl(): string {
