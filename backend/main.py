@@ -20,7 +20,10 @@ app = FastAPI(title="Real Estate Chatbot API")
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4200"],  # Angular default port
+    allow_origins=[
+        "http://localhost:4200",  # Angular default port for local development
+        "https://real-estate-chatbot-83uu.onrender.com"  # Deployed frontend
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

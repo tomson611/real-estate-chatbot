@@ -121,9 +121,15 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     this.http.post<ChatResponse>(`${this.apiService.getApiUrl()}/chat`, payload)
       .subscribe({
         next: (response) => {
-          console.log('Response from backend:', response);
+          console.log('Raw response from backend:', response);
+          console.log('Response type:', typeof response);
+          console.log('Response keys:', Object.keys(response));
           
           if (response && response.response) {
+            console.log('Response.response:', response.response);
+            console.log('Response.response type:', typeof response.response);
+            console.log('Response.response keys:', Object.keys(response.response));
+            
             const assistantMessage = {
               role: 'assistant',
               content: response.response
@@ -133,7 +139,8 @@ export class ChatComponent implements OnInit, AfterViewChecked {
             this.messages.push(assistantMessage);
             this.displayMessages.push(assistantMessage);
           } else {
-            console.error('Unexpected response format:', response);
+            console.error('Unexpected response format. Full response:', response);
+            console.error('Expected format:', { response: { text: string, properties?: Property[] } });
             const errorMessage = {
               role: 'assistant',
               content: 'Sorry, I received an unexpected response format. Please try again.'
@@ -144,6 +151,8 @@ export class ChatComponent implements OnInit, AfterViewChecked {
         },
         error: (error) => {
           console.error('Error details:', error);
+          console.error('Error response:', error.error);
+          console.error('Error status:', error.status);
           const errorMessage = {
             role: 'assistant',
             content: 'Sorry, I encountered an error. Please try again.'
