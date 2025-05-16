@@ -2,7 +2,7 @@ import { Component, OnInit, ViewChild, ElementRef, AfterViewChecked } from '@ang
 import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Property } from '../models/property.interface';
-import { environment } from '../../environments/environment';
+import { ApiService } from '../services/api.service';
 
 interface Message {
   role: string;
@@ -30,7 +30,12 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   lastMessageTime: number = 0;
   cooldownPeriod: number = 2000; // 2 seconds cooldown
 
-  constructor(private http: HttpClient, private router: Router, private route: ActivatedRoute) {}
+  constructor(
+    private http: HttpClient,
+    private router: Router,
+    private route: ActivatedRoute,
+    private apiService: ApiService
+  ) {}
 
   ngOnInit() {
     this.displayMessages.push({
@@ -111,8 +116,9 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
     const payload = { messages: formattedMessages };
     console.log('Sending to backend:', payload);
+    console.log('Using API URL:', this.apiService.getApiUrl());
 
-    this.http.post<ChatResponse>(`${environment.apiUrl}/chat`, payload)
+    this.http.post<ChatResponse>(`${this.apiService.getApiUrl()}/chat`, payload)
       .subscribe({
         next: (response) => {
           console.log('Response from backend:', response);
