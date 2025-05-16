@@ -6,4 +6,4 @@ requests==2.31.0
 pydantic==1.10.7
 python-multipart==0.0.6
 redis==5.0.1
-httpx>=0.24.1
+httpx==0.23.3
