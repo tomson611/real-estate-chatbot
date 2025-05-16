@@ -140,7 +140,19 @@ export class ChatComponent implements OnInit, AfterViewChecked {
             this.displayMessages.push(assistantMessage);
           } else {
             console.error('Unexpected response format. Full response:', response);
-            console.error('Expected format:', { response: { text: string, properties?: Property[] } });
+            console.error('Expected format example:', {
+                response: {
+                    text: "Example response text",
+                    properties: [{
+                        address: "123 Example St",
+                        price: "$500,000",
+                        beds: 3,
+                        baths: 2,
+                        sqft: "2,000",
+                        description: "Example property description"
+                    }]
+                }
+            });
             const errorMessage = {
               role: 'assistant',
               content: 'Sorry, I received an unexpected response format. Please try again.'
