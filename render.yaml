@@ -1,0 +1,15 @@
+services:
+  - type: web
+    name: real-estate-chatbot-frontend
+    env: static
+    buildCommand: cd frontend && npm install && npm run build --prod
+    staticPublishPath: frontend/dist/real-estate-chatbot-frontend
+    envVars:
+      - key: NODE_VERSION
+        value: 18.17.0
+      - key: API_URL
+        sync: false  # This means you'll need to set this value in the Render dashboard
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html 

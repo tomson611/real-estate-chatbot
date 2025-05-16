@@ -2,6 +2,7 @@ import { Component, OnInit, ViewChild, ElementRef, AfterViewChecked } from '@ang
 import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Property } from '../models/property.interface';
+import { environment } from '../../environments/environment';
 
 interface Message {
   role: string;
@@ -111,7 +112,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     const payload = { messages: formattedMessages };
     console.log('Sending to backend:', payload);
 
-    this.http.post<ChatResponse>('http://127.0.0.1:8000/api/chat', payload)
+    this.http.post<ChatResponse>(`${environment.apiUrl}/chat`, payload)
       .subscribe({
         next: (response) => {
           console.log('Response from backend:', response);
