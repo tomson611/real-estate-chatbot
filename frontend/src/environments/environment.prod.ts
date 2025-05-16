@@ -6,5 +6,5 @@ declare const process: {
 
 export const environment = {
   production: true,
-  apiUrl: process.env['API_URL'] || 'http://127.0.0.1:8000/api'
+  apiUrl: 'API_URL_PLACEHOLDER'  // This will be replaced during build
 }; 

@@ -2,7 +2,11 @@ services:
   - type: web
     name: real-estate-chatbot-frontend
     env: static
-    buildCommand: cd frontend && npm install && npm run build --prod
+    buildCommand: |
+      cd frontend && \
+      npm install && \
+      sed -i "s|API_URL_PLACEHOLDER|$API_URL|g" src/environments/environment.prod.ts && \
+      npm run build --prod
     staticPublishPath: frontend/dist/real-estate-chatbot-frontend
     envVars:
       - key: NODE_VERSION
