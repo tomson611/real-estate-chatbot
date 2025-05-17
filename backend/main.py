@@ -387,52 +387,52 @@ async def chat(chat_request: ChatRequest, request: Request):
         mortgage_pattern = r"(?:purchase price|loan amount)?\\s*\\$?(\\d+(?:,\\d{3})*(?:\\.\\d{2})?)\\s*(?:interest rate|rate)\\s*(\\d+(?:\\.\\d+)?)%?\\s*(?:loan|for)\\s*(\\d+)\\s*(?:years?|yrs?)?"
         mortgage_match = re.search(mortgage_pattern, last_user_message.content.lower())
         
-        if mortgage_match:
-            try:
-                loan_amount = float(mortgage_match.group(1).replace(',', '')) if mortgage_match.group(1) else None
-                interest_rate = float(mortgage_match.group(2)) if mortgage_match.group(2) else None
-                loan_term = int(mortgage_match.group(3)) if mortgage_match.group(3) else None
+        # if mortgage_match:
+        #     try:
+        #         loan_amount = float(mortgage_match.group(1).replace(',', '')) if mortgage_match.group(1) else None
+        #         interest_rate = float(mortgage_match.group(2)) if mortgage_match.group(2) else None
+        #         loan_term = int(mortgage_match.group(3)) if mortgage_match.group(3) else None
                 
-                if loan_amount and interest_rate and loan_term:
-                    result = calculate_mortgage_payment(loan_amount, interest_rate, loan_term)
-                    response_text = (
-                        f"Based on your inputs:\\n"
-                        f"Loan Amount: ${loan_amount:,.2f}\\n"
-                        f"Interest Rate: {interest_rate}%\\n"
-                        f"Loan Term: {loan_term} years\\n"
-                        f"Down Payment: $0.00\\n\\n"
-                        f"Your estimated monthly payment would be: ${result['monthly_payment']:,.2f}\\n\\n"
-                        f"Additional details:\\n"
-                        f"Total payment over loan term: ${result['total_payment']:,.2f}\\n"
-                        f"Total interest paid: ${result['total_interest']:,.2f}\\n\\n"
-                        f"Note: This calculation does not include property taxes, homeowners insurance, or PMI if applicable."
-                    )
-                    response_text = re.sub(r'<[^>]+>', '', response_text)
-                    response_text = re.sub(r' +', ' ', response_text)
-                    return {"response": {"text": response_text, "properties": []}}
-                else:
-                    return {
-                        "response": {
-                            "text": ("I need more information to calculate your mortgage payment. Please provide:\\n"
-                                   "1. The loan amount (or purchase price)\\n"
-                                   "2. The interest rate\\n"
-                                   "3. The loan term (in years)\\n"
-                                   "4. Any down payment amount, if applicable"),
-                            "properties": []
-                        }
-                    }
-            except Exception as e:
-                print(f"Error calculating mortgage: {str(e)}")
-                return {
-                    "response": {
-                        "text": ("I encountered an error while calculating your mortgage payment. Please try again with the required information:\\n\\n"
-                               "1. The loan amount (or purchase price)\\n"
-                               "2. The interest rate\\n"
-                               "3. The loan term (in years)\\n"
-                               "4. Any down payment amount, if applicable"),
-                        "properties": []
-                    }
-                }
+        #         if loan_amount and interest_rate and loan_term:
+        #             result = calculate_mortgage_payment(loan_amount, interest_rate, loan_term)
+        #             response_text = (
+        #                 f"Based on your inputs:\\n"
+        #                 f"Loan Amount: ${loan_amount:,.2f}\\n"
+        #                 f"Interest Rate: {interest_rate}%\\n"
+        #                 f"Loan Term: {loan_term} years\\n"
+        #                 f"Down Payment: $0.00\\n\\n"
+        #                 f"Your estimated monthly payment would be: ${result['monthly_payment']:,.2f}\\n\\n"
+        #                 f"Additional details:\\n"
+        #                 f"Total payment over loan term: ${result['total_payment']:,.2f}\\n"
+        #                 f"Total interest paid: ${result['total_interest']:,.2f}\\n\\n"
+        #                 f"Note: This calculation does not include property taxes, homeowners insurance, or PMI if applicable."
+        #             )
+        #             response_text = re.sub(r'<[^>]+>', '', response_text)
+        #             response_text = re.sub(r' +', ' ', response_text)
+        #             return {"response": {"text": response_text, "properties": []}}
+        #         else:
+        #             return {
+        #                 "response": {
+        #                     "text": ("I need more information to calculate your mortgage payment. Please provide:\\n"
+        #                            "1. The loan amount (or purchase price)\\n"
+        #                            "2. The interest rate\\n"
+        #                            "3. The loan term (in years)\\n"
+        #                            "4. Any down payment amount, if applicable"),
+        #                     "properties": []
+        #                 }
+        #             }
+        #     except Exception as e:
+        #         print(f"Error calculating mortgage: {str(e)}")
+        #         return {
+        #             "response": {
+        #                 "text": ("I encountered an error while calculating your mortgage payment. Please try again with the required information:\\n\\n"
+        #                        "1. The loan amount (or purchase price)\\n"
+        #                        "2. The interest rate\\n"
+        #                        "3. The loan term (in years)\\n"
+        #                        "4. Any down payment amount, if applicable"),
+        #                 "properties": []
+        #             }
+        #         }
 
         # Initialize search parameters
         location: Optional[str] = None
