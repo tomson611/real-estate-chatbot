@@ -472,29 +472,80 @@ async def chat(chat_request: ChatRequest, request: Request):
 
         if not parsed_from_assistant:
             content_lower = last_user_message.content.lower()
-            location_pattern = r"(?:in|near|at|around|listings in|properties in|homes in|for|search|looking for|show me)\s+((?:[a-zA-Z]+\s*)+,\s*[A-Z]{2}|(?:[a-zA-Z]+\s*)+)(?:\s+under|\s+over|\s+below|\s+above|\s+with|[?.!,]|$)|^((?:[a-zA-Z]+\s*)+,\s*[A-Z]{2}|(?:[a-zA-Z]+\s*)+)\s*(?:listings|properties|homes)?"
+            
+            # 1. Extract price and bathrooms
             price_pattern = r"(?:under|below|less than|maximum|max|up to|around|for)\s*\$?([0-9,]+(?:\.\d{1,2})?)"
-            property_type_pattern = r"(?:type|kind|style|a|an)\s+(condo|townhouse|single-family|house|apartment|multi-family|land)(?:\s+with|\s+that|\s+and|\s+under|[?.!,]|$)"
             bathrooms_pattern = r"(\d+(?:\.\d+)?)\s*(?:bathrooms?|baths?)"
-
-            location_match_user = re.search(location_pattern, content_lower)
             price_match_user = re.search(price_pattern, content_lower)
-            property_type_match_user = re.search(property_type_pattern, content_lower)
             bathrooms_match_user = re.search(bathrooms_pattern, content_lower)
-
-            if location_match_user:
-                loc_str = location_match_user.group(1) or location_match_user.group(2)
-                if loc_str: location = loc_str.strip().rstrip(',').strip()
             if price_match_user: max_price = float(price_match_user.group(1).replace(',', ''))
-            if property_type_match_user:
-                property_type = property_type_match_user.group(1).strip().capitalize()
-                if property_type == "House": property_type = "Single-Family"
             if bathrooms_match_user: min_bathrooms = float(bathrooms_match_user.group(1))
 
-            property_keywords = ["listings", "properties", "homes", "houses", "for sale", "buy", "purchase", "condo", "townhouse", "apartment"]
-            if location or property_type or max_price or min_bathrooms: is_property_search = True
-            if not is_property_search: is_property_search = any(keyword in content_lower for keyword in property_keywords)
-            print(f"Parameters parsed from user message: L='{location}', PT='{property_type}', B='{min_bathrooms}', P='{max_price}', IsSearch={is_property_search}")
+            # 2. Extract Property Type
+            property_type_keyword_found: Optional[str] = None
+            known_property_keywords_map = {
+                "single-family homes": "Single-Family", "single family homes": "Single-Family",
+                "single-family home": "Single-Family", "single family home": "Single-Family",
+                "multi-family homes": "Multi-Family", "multi family homes": "Multi-Family",
+                "multi-family home": "Multi-Family", "multi family home": "Multi-Family",
+                "townhouses": "Townhouse", "townhouse": "Townhouse",
+                "condos": "Condo", "condo": "Condo",
+                "houses": "Single-Family", "house": "Single-Family", 
+                "apartments": "Apartment", "apartment": "Apartment",
+                "land plots": "Land", "land plot": "Land", "land": "Land"
+            }
+            sorted_pt_keywords = sorted(known_property_keywords_map.keys(), key=len, reverse=True)
+            for kw in sorted_pt_keywords:
+                if re.search(r'\b' + re.escape(kw) + r'\b', content_lower):
+                    property_type = known_property_keywords_map[kw]
+                    property_type_keyword_found = kw 
+                    print(f"Property type '{property_type}' found from keyword '{kw}'")
+                    break
+            
+            if not property_type: 
+                property_type_pattern_orig = r"(?:type|kind|style|a|an)\s+(condo|townhouse|single-family|house|apartment|multi-family|land)\b"
+                pt_match_regex = re.search(property_type_pattern_orig, content_lower)
+                if pt_match_regex:
+                    raw_pt = pt_match_regex.group(1).strip().lower()
+                    property_type = known_property_keywords_map.get(raw_pt, raw_pt.capitalize())
+                    if property_type == "House": property_type = "Single-Family"
+                    print(f"Property type '{property_type}' found from regex pattern for '{raw_pt}'.")
+
+            # 3. Extract Location
+            location_pattern = r"(?:in|near|at|around|for|search|looking for|show me)\s+((?:[a-zA-Z\s\-]+(?:,\s*[A-Z]{2})?)|(?:[a-zA-Z\s\-]+))(?=\s+(?:under|over|below|above|with|and|listings|properties|homes|condos|houses|apartments)|[?.!,]|$)|^((?:[a-zA-Z\s\-]+(?:,\s*[A-Z]{2})?)|(?:[a-zA-Z\s\-]+))\s*(?:listings|properties|homes|condos|houses|apartments)?"
+            location_match_user = re.search(location_pattern, content_lower)
+            if location_match_user:
+                loc_str_group1 = location_match_user.group(1)
+                loc_str_group2 = location_match_user.group(2)
+                potential_location = loc_str_group1 if loc_str_group1 else loc_str_group2
+                if potential_location:
+                    location = potential_location.strip().rstrip(',').strip()
+                    print(f"Initial location extracted: '{location}'")
+                    if property_type and property_type_keyword_found:
+                        if location.lower() == property_type_keyword_found.lower():
+                            location = None 
+                            print(f"Location was identical to property type keyword '{property_type_keyword_found}', reset to None.")
+                        elif location.lower().endswith(" " + property_type_keyword_found.lower()):
+                            location = location[:-(len(property_type_keyword_found) + 1)].strip()
+                            print(f"Location refined by removing suffix ' {property_type_keyword_found}': '{location}'")
+            
+            if not location and property_type_keyword_found and len(content_lower.split()) <= 5:
+                keyword_parts = re.split(r'(' + re.escape(property_type_keyword_found) + r')', content_lower, flags=re.IGNORECASE)
+                potential_loc_str = "".join([part for i, part in enumerate(keyword_parts) if i != 1 and part]).strip()
+                if potential_loc_str:
+                    words_to_remove = ["listings", "properties", "homes", "for", "sale", "show", "me", "find", "search", "looking", "a", "an", "in", "near", "at", "around", "of", "is", "are", "what", "how", "many", "the"]
+                    temp_loc_parts = [word for word in potential_loc_str.split() if word.lower() not in words_to_remove]
+                    final_inferred_loc = " ".join(temp_loc_parts).strip()
+                    if final_inferred_loc and final_inferred_loc.lower() != property_type_keyword_found.lower():
+                        location = final_inferred_loc
+                        print(f"Location inferred from remaining short query after PT removal: '{location}'")
+            
+            if location or property_type or max_price or min_bathrooms:
+                is_property_search = True
+            if not is_property_search:
+                property_intent_keywords = ["listings", "properties", "homes", "houses", "for sale", "buy", "purchase", "condo", "townhouse", "apartment", "rentcast"]
+                is_property_search = any(keyword in content_lower for keyword in property_intent_keywords)
+            print(f"Final Parameters before RentCast: L='{location}', PT='{property_type}', B='{min_bathrooms}', P='{max_price}', IsSearch={is_property_search}")
 
         if location and is_property_search:
             try:
