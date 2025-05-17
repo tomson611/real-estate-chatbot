@@ -445,30 +445,33 @@ async def chat(chat_request: ChatRequest, request: Request):
         is_property_search: bool = False
         
         # --- Start of LLM-based Parameter Extraction ---
-        parameter_extraction_prompt = (
-            f"Extract the following parameters from the user's message for a real estate property search:\\n"
-            f"- location (string, e.g., \\"San Francisco, CA\\", \\"downtown Austin\\")\\n"
-            f"- property_type (string, one of: \\"Single-Family\\", \\"Condo\\", \\"Townhouse\\", \\"Multi-Family\\", \\"Apartment\\", \\"Land\\")\\n"
-            f"- max_price (float, e.g., 500000.0)\\n"
-            f"- min_bathrooms (float, e.g., 2.0 or 2.5)\\n\\n"
-            f"User message: \\"{last_user_message.content}\\"\\n\\n"
-            f"Respond ONLY with a JSON object containing the extracted parameters.\\n"
-            f"If a parameter is not mentioned, omit it or set its value to null.\\n"
-            f"Example response for \\"Show me condos in Seattle under $700k with at least 2 baths\\":\\n"
-            f"{{{{\\n"  # Escaped curly braces for literal output
-            f"  \\"location\\": \\"Seattle\\",\\n"
-            f"  \\"property_type\\": \\"Condo\\",\\n"
-            f"  \\"max_price\\": 700000.0,\\n"
-            f"  \\"min_bathrooms\\": 2.0\\n"
-            f"}}}}\\n" # Escaped curly braces for literal output
-            f"Example response for \\"apartments in los angeles\\":\\n"
-            f"{{{{\\n"  # Escaped curly braces for literal output
-            f"  \\"location\\": \\"los angeles\\",\\n"
-            f"  \\"property_type\\": \\"Apartment\\"\\n"
-            f"}}}}\\n" # Escaped curly braces for literal output
-            f"Example response for \\"Tell me about the weather\\":\\n"
-            f"{{{{}}}}"  # Escaped curly braces for literal output
-        )
+        # Ensure last_user_message.content is properly escaped if it contains quotes, for the f-string.
+        # Python's f-string will handle escaping of the content itself if it's a variable.
+        # The quotes around JSON examples need to be \\'\\''\\' or escaped if the outer f-string uses ".
+        parameter_extraction_prompt = f'''Extract the following parameters from the user\\'s message for a real estate property search:
+- location (string, e.g., "San Francisco, CA", "downtown Austin")
+- property_type (string, one of: "Single-Family", "Condo", "Townhouse", "Multi-Family", "Apartment", "Land")
+- max_price (float, e.g., 500000.0)
+- min_bathrooms (float, e.g., 2.0 or 2.5)
+
+User message: "{last_user_message.content}"
+
+Respond ONLY with a JSON object containing the extracted parameters.
+If a parameter is not mentioned, omit it or set its value to null.
+Example response for "Show me condos in Seattle under $700k with at least 2 baths":
+{{{{
+  "location": "Seattle",
+  "property_type": "Condo",
+  "max_price": 700000.0,
+  "min_bathrooms": 2.0
+}}}}
+Example response for "apartments in los angeles":
+{{{{
+  "location": "los angeles",
+  "property_type": "Apartment"
+}}}}
+Example response for "Tell me about the weather":
+{{{{}}}}'''
         try:
             print("Attempting LLM parameter extraction...")
             extraction_messages = [
