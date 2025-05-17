@@ -542,17 +542,19 @@ async def chat(chat_request: ChatRequest, request: Request):
         
         print(f"After parameter extraction attempts: L='{location}', PT='{property_type}', B='{min_bathrooms}', P='{max_price}', IsSearch={is_property_search}")
 
-        if location and is_property_search:
+        is_valid_location_string = isinstance(location, str) and location.strip() != ""
+
+        if is_valid_location_string and is_property_search:
             try:
-                properties = get_rentcast_data(location, max_price, property_type, min_bathrooms)
+                properties = get_rentcast_data(location.strip(), max_price, property_type, min_bathrooms)
                 if properties and len(properties) > 0:
-                    text = f"Here are some {property_type.lower() if property_type else 'properties'} I found in {location}"
+                    text = f"Here are some {property_type.lower() if property_type else 'properties'} I found in {location.strip()}"
                     if max_price: text += f" under ${max_price:,.0f}"
                     if min_bathrooms: text += f" with at least {min_bathrooms:.0f} bathroom(s)"
                     text += ":"
                     return {"response": {"text": text, "properties": properties}}
                 else:
-                    return {"response": {"text": f"I couldn't find any {property_type.lower() if property_type else 'properties'} matching your criteria in {location}. Would you like to try a different search?", "properties": []}}
+                    return {"response": {"text": f"I couldn't find any {property_type.lower() if property_type else 'properties'} matching your criteria in {location.strip()}. Would you like to try a different search?", "properties": []}}
             except Exception as e:
                 print(f"Error fetching RentCast data: {str(e)}")
                 return {"response": {"text": "I encountered an error while searching for properties. Please try again later.", "properties": []}}
