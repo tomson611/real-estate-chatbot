@@ -382,60 +382,44 @@ async def chat(chat_request: ChatRequest, request: Request):
         # Check rate limit
         await rate_limit_dependency(request)
         
-        # Extract location and price from the last user message
         last_user_message = next((msg for msg in reversed(chat_request.messages) if msg.role == "user"), None)
         if not last_user_message:
             raise HTTPException(status_code=400, detail="No user message found")
 
-        # Check if this is a mortgage calculation request
+        # Mortgage calculation logic (keep as is, ensure f-strings and regex are correct)
         mortgage_pattern = r"(?:purchase price|loan amount)?\s*\$?(\d+(?:,\d{3})*(?:\.\d{2})?)\s*(?:interest rate|rate)\s*(\d+(?:\.\d+)?)%?\s*(?:loan|for)\s*(\d+)\s*(?:years?|yrs?)?"
         mortgage_match = re.search(mortgage_pattern, last_user_message.content.lower())
         
         if mortgage_match:
             try:
-                # Extract mortgage parameters
                 loan_amount = float(mortgage_match.group(1).replace(',', '')) if mortgage_match.group(1) else None
                 interest_rate = float(mortgage_match.group(2)) if mortgage_match.group(2) else None
                 loan_term = int(mortgage_match.group(3)) if mortgage_match.group(3) else None
                 
-                print(f"Extracted parameters - Loan: {loan_amount}, Rate: {interest_rate}, Term: {loan_term}")  # Debug log
-                
-                # If we have all required parameters, calculate the mortgage
                 if loan_amount and interest_rate and loan_term:
                     result = calculate_mortgage_payment(loan_amount, interest_rate, loan_term)
-                    
-                    # Format the response with proper $ symbols
-                    response_text = f"""Based on your inputs:
-Loan Amount: ${loan_amount:,.2f}
-Interest Rate: {interest_rate}%
-Loan Term: {loan_term} years
-Down Payment: $0.00
-
-Your estimated monthly payment would be: ${result['monthly_payment']:,.2f}
-
-Additional details:
-Total payment over loan term: ${result['total_payment']:,.2f}
-Total interest paid: ${result['total_interest']:,.2f}
-
-Note: This calculation does not include property taxes, homeowners insurance, or PMI if applicable."""
-                    
-                    # Clean the response text without modifying the newlines
-                    response_text = re.sub(r'<[^>]+>', '', response_text)  # Remove HTML tags
-                    response_text = re.sub(r' +', ' ', response_text)  # Fix extra spaces
-                    
-                    return {
-                        "response": {
-                            "text": response_text
-                        }
-                    }
+                    response_text = (
+                        f"Based on your inputs:\n"
+                        f"Loan Amount: ${loan_amount:,.2f}\n"
+                        f"Interest Rate: {interest_rate}%\n"
+                        f"Loan Term: {loan_term} years\n"
+                        f"Down Payment: $0.00\n\n"
+                        f"Your estimated monthly payment would be: ${result['monthly_payment']:,.2f}\n\n"
+                        f"Additional details:\n"
+                        f"Total payment over loan term: ${result['total_payment']:,.2f}\n"
+                        f"Total interest paid: ${result['total_interest']:,.2f}\n\n"
+                        f"Note: This calculation does not include property taxes, homeowners insurance, or PMI if applicable."
+                    )
+                    response_text = re.sub(r'<[^>]+>', '', response_text)
+                    response_text = re.sub(r' +', ' ', response_text)
+                    return {"response": {"text": response_text, "properties": []}}
                 else:
-                    # If we don't have all parameters, ask for them
                     return {
                         "response": {
-                            "text": "I need more information to calculate your mortgage payment. Please provide:\n"
-                                   "1. The loan amount (or purchase price)\n"
-                                   "2. The interest rate\n"
-                                   "3. The loan term (in years)\n"
+                            "text": "I need more information to calculate your mortgage payment. Please provide:\n" \
+                                   "1. The loan amount (or purchase price)\n" \
+                                   "2. The interest rate\n" \
+                                   "3. The loan term (in years)\n" \
                                    "4. Any down payment amount, if applicable",
                             "properties": []
                         }
@@ -444,95 +428,106 @@ Note: This calculation does not include property taxes, homeowners insurance, or
                 print(f"Error calculating mortgage: {str(e)}")
                 return {
                     "response": {
-                        "text": "I encountered an error while calculating your mortgage payment. Please try again with the required information:\n\n1. The loan amount (or purchase price)\n2. The interest rate\n3. The loan term (in years)\n4. Any down payment amount, if applicable",
+                        "text": "I encountered an error while calculating your mortgage payment. Please try again with the required information:\n\n" \
+                               "1. The loan amount (or purchase price)\n" \
+                               "2. The interest rate\n" \
+                               "3. The loan term (in years)\n" \
+                               "4. Any down payment amount, if applicable",
                         "properties": []
                     }
                 }
 
-        # Extract location, price, property type, and bathrooms using regex
-        location_pattern = r"(?:in|near|at|around|listings in|properties in|homes in)\s+([a-zA-Z\s]+?)(?:\s+under|\s+over|\s+below|\s+above|[?.!,]|$)|^(?:listings|properties|homes)\s+([a-zA-Z\s]+?)(?:\s+under|\s+over|\s+below|\s+above|[?.!,]|$)|(?:listings|properties|homes)\s+([a-zA-Z\s]+?)(?:\s+under|\s+over|\s+below|\s+above|[?.!,]|$)"
-        price_pattern = r"(?:under|below|less than|maximum|max|up to)\s*\$?(\d+(?:,\d{3})*(?:\.\d{2})?)"
-        property_type_pattern = r"(?:type|kind|style)\s+(?:of|is|are|:)\s*([a-zA-Z\s-]+?)(?:\s+with|\s+that|\s+and|\s+under|[?.!,]|$)"
-        bathrooms_pattern = r"(?:bathrooms?|baths?)\s*(?:of|is|are|:)\s*(\d+(?:\.\d+)?)"
+        # Initialize search parameters
+        location: Optional[str] = None
+        max_price: Optional[float] = None
+        property_type: Optional[str] = None
+        min_bathrooms: Optional[float] = None
+        is_property_search: bool = False
+        parsed_from_assistant: bool = False
 
-        location_match = re.search(location_pattern, last_user_message.content.lower())
-        price_match = re.search(price_pattern, last_user_message.content.lower())
-        property_type_match = re.search(property_type_pattern, last_user_message.content.lower())
-        bathrooms_match = re.search(bathrooms_pattern, last_user_message.content.lower())
+        simple_confirmations = [
+            "that is all", "yes", "correct", "proceed", "go ahead", "ok", 
+            "sounds good", "yep", "confirm", "sounds right", "looks good",
+            "that's it", "perfect", "great", "that looks right", "that's correct"
+        ]
 
-        location = location_match.group(1) or location_match.group(2) or location_match.group(3) if location_match else None
-        max_price = float(price_match.group(1).replace(',', '')) if price_match else None
-        property_type = property_type_match.group(1).strip() if property_type_match else None
-        min_bathrooms = float(bathrooms_match.group(1)) if bathrooms_match else None
+        if len(chat_request.messages) >= 2 and last_user_message.content.strip().lower() in simple_confirmations:
+            potential_assistant_message = chat_request.messages[-2]
+            if potential_assistant_message.role == "assistant":
+                assistant_confirmation_text = potential_assistant_message.content
+                loc_match_assist = re.search(r"Location:\s*([^\n]+)", assistant_confirmation_text, re.IGNORECASE)
+                pt_match_assist = re.search(r"Property Type:\s*([^\n]+)", assistant_confirmation_text, re.IGNORECASE)
+                bath_match_assist = re.search(r"Number of Bathrooms:\s*(\d+(?:\.\d+)?)", assistant_confirmation_text, re.IGNORECASE)
+                price_match_assist = re.search(r"Maximum Price:\s*\$?([0-9,]+(?:\.\d{1,2})?)", assistant_confirmation_text, re.IGNORECASE)
 
-        # Check if this is a property search request
-        is_property_search = any([
-            "listings" in last_user_message.content.lower(),
-            "properties" in last_user_message.content.lower(),
-            "homes" in last_user_message.content.lower(),
-            "houses" in last_user_message.content.lower(),
-            "for sale" in last_user_message.content.lower(),
-            "buy" in last_user_message.content.lower(),
-            "purchase" in last_user_message.content.lower()
-        ])
+                if loc_match_assist: location = loc_match_assist.group(1).strip()
+                if pt_match_assist: property_type = pt_match_assist.group(1).strip().capitalize()
+                if bath_match_assist: min_bathrooms = float(bath_match_assist.group(1))
+                if price_match_assist: max_price = float(price_match_assist.group(1).replace(',', ''))
+                
+                if location:
+                    is_property_search = True
+                    parsed_from_assistant = True
+                    print(f"Parameters parsed from assistant confirmation: L='{location}', PT='{property_type}', B='{min_bathrooms}', P='{max_price}'")
 
-        # If we have a location and it's a property search request, try to get property data
+        if not parsed_from_assistant:
+            content_lower = last_user_message.content.lower()
+            location_pattern = r"(?:in|near|at|around|listings in|properties in|homes in|for|search|looking for|show me)\s+((?:[a-zA-Z]+\s*)+,\s*[A-Z]{2}|(?:[a-zA-Z]+\s*)+)(?:\s+under|\s+over|\s+below|\s+above|\s+with|[?.!,]|$)|^((?:[a-zA-Z]+\s*)+,\s*[A-Z]{2}|(?:[a-zA-Z]+\s*)+)\s*(?:listings|properties|homes)?"
+            price_pattern = r"(?:under|below|less than|maximum|max|up to|around|for)\s*\$?([0-9,]+(?:\.\d{1,2})?)"
+            property_type_pattern = r"(?:type|kind|style|a|an)\s+(condo|townhouse|single-family|house|apartment|multi-family|land)(?:\s+with|\s+that|\s+and|\s+under|[?.!,]|$)"
+            bathrooms_pattern = r"(\d+(?:\.\d+)?)\s*(?:bathrooms?|baths?)"
+
+            location_match_user = re.search(location_pattern, content_lower)
+            price_match_user = re.search(price_pattern, content_lower)
+            property_type_match_user = re.search(property_type_pattern, content_lower)
+            bathrooms_match_user = re.search(bathrooms_pattern, content_lower)
+
+            if location_match_user:
+                loc_str = location_match_user.group(1) or location_match_user.group(2)
+                if loc_str: location = loc_str.strip().rstrip(',').strip()
+            if price_match_user: max_price = float(price_match_user.group(1).replace(',', ''))
+            if property_type_match_user:
+                property_type = property_type_match_user.group(1).strip().capitalize()
+                if property_type == "House": property_type = "Single-Family"
+            if bathrooms_match_user: min_bathrooms = float(bathrooms_match_user.group(1))
+
+            property_keywords = ["listings", "properties", "homes", "houses", "for sale", "buy", "purchase", "condo", "townhouse", "apartment"]
+            if location or property_type or max_price or min_bathrooms: is_property_search = True
+            if not is_property_search: is_property_search = any(keyword in content_lower for keyword in property_keywords)
+            print(f"Parameters parsed from user message: L='{location}', PT='{property_type}', B='{min_bathrooms}', P='{max_price}', IsSearch={is_property_search}")
+
         if location and is_property_search:
             try:
                 properties = get_rentcast_data(location, max_price, property_type, min_bathrooms)
                 if properties and len(properties) > 0:
-                    return {
-                        "response": {
-                            "text": "",
-                            "properties": properties
-                        }
-                    }
+                    text = f"Here are some {property_type.lower() if property_type else 'properties'} I found in {location}"
+                    if max_price: text += f" under ${max_price:,.0f}"
+                    if min_bathrooms: text += f" with at least {min_bathrooms:.0f} bathroom(s)"
+                    text += ":"
+                    return {"response": {"text": text, "properties": properties}}
                 else:
-                    # If no properties found, return a message and empty properties array
-                    return {
-                        "response": {
-                            "text": "I couldn't find any properties matching your criteria. Would you like to try a different search?",
-                            "properties": []  # Explicitly set to empty array
-                        }
-                    }
+                    return {"response": {"text": f"I couldn't find any {property_type.lower() if property_type else 'properties'} matching your criteria in {location}. Would you like to try a different search?", "properties": []}}
             except Exception as e:
                 print(f"Error fetching RentCast data: {str(e)}")
-                return {
-                    "response": {
-                        "text": "I encountered an error while searching for properties. Please try again later.",
-                        "properties": []  # Explicitly set to empty array
-                    }
-                }
+                return {"response": {"text": "I encountered an error while searching for properties. Please try again later.", "properties": []}}
 
-        # If no location or not a property search request, let GPT handle the response
         messages = [
             {"role": "system", "content": SYSTEM_MESSAGE},
             *[{"role": msg.role, "content": msg.content} for msg in chat_request.messages]
         ]
-        
-        response = client.chat.completions.create(
+        openai_response = client.chat.completions.create(
             model=OPENAI_MODEL,
             messages=messages,
             temperature=0.7
         )
-        
-        # Clean and format the response text
-        response_text = response.choices[0].message.content
-        # Remove any HTML tags
+        response_text = openai_response.choices[0].message.content
         response_text = re.sub(r'<[^>]+>', '', response_text)
-        # Fix any double newlines
-        response_text = re.sub(r'\n\n+', '\n\n', response_text)
-        # Fix any extra spaces
+        response_text = re.sub(r'\n\n+', '\n\n', response_text) # Corrected regex for newlines
         response_text = re.sub(r' +', ' ', response_text)
-        # Remove any JSON-like formatting
-        response_text = re.sub(r'^\s*{\s*"text"\s*:\s*"', '', response_text)
-        response_text = re.sub(r'"\s*}\s*$', '', response_text)
-        
-        return {
-            "response": {
-                "text": response_text
-            }
-        }
+        response_text = re.sub(r'^\s*{\s*"text"\s*:\s*"', '', response_text) # Corrected regex
+        response_text = re.sub(r'"\s*}\s*$', '', response_text) # Corrected regex
+        return {"response": {"text": response_text}}
+
     except Exception as e:
         print(f"Error in chat endpoint: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
