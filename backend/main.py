@@ -568,10 +568,10 @@ Example response for "Tell me about the weather":
         )
         response_text = openai_response.choices[0].message.content
         response_text = re.sub(r'<[^>]+>', '', response_text)
-        response_text = re.sub(r'\n\n+', '\n\n', response_text)
+        # response_text = re.sub(r'\n\n+', '\n\n', response_text) # Temporarily disable
         response_text = re.sub(r' +', ' ', response_text)
-        response_text = re.sub(r'^\\s*\\{\\s*"text"\\s*:\\s*"', '', response_text)
-        response_text = re.sub(r'"\\s*}\\s*$', '', response_text)
+        # response_text = re.sub(r'^\s*\{\s*"text"\s*:\s*"', '', response_text) # Temporarily disable
+        # response_text = re.sub(r'"\s*\}\s*$', '', response_text) # Temporarily disable
         
         return {"response": {"text": response_text}}
 
