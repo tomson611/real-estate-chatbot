@@ -564,18 +564,87 @@ async def chat(chat_request: ChatRequest, request: Request):
                     location = temp_loc_str
                     print(f"Location inferred from short query '{content_lower}' after PT & preposition removal: '{location}'")
 
-            # 6. Determine if it's a property search
-            if location or property_type or max_price or min_bathrooms: 
-                is_property_search = True
-            if not is_property_search: 
-                property_intent_keywords = ["listings", "properties", "homes", "houses", "for sale", "buy", "purchase", "rentcast"]
-                property_intent_keywords.extend(known_property_keywords_map.keys())
-                # CORRECTED REGEX pattern:
-                is_property_search = any(re.search(r'\b' + re.escape(keyword) + r'\b', content_lower) for keyword in property_intent_keywords)
+            # 6. Determine if it's a property search and refine location
+            # `location` here is the string extracted by regex, or None.
+            # `property_type`, `max_price`, `min_bathrooms` are also set.
             
-            print(f"Final Parameters before RentCast: L='{location}', PT='{property_type}', B='{min_bathrooms}', P='{max_price}', IsSearch={is_property_search}")
-        # --- End of Original Regex-based Parameter Extraction ---
+            final_search_location = location # This will be used for API call if it's a search
+            is_property_search = False # Default to False
 
+            if parsed_from_assistant:
+                if location: # Location must have been extracted from assistant's confirmation
+                    is_property_search = True
+                    # final_search_location is already 'location'
+                    print(f"Property search: Parameters confirmed by user from assistant. Location: '{final_search_location}'")
+                else:
+                    print("Warning: Parsed from assistant confirmation, but no location found in assistant's message. Treating as general query.")
+                    is_property_search = False 
+                    final_search_location = None # Ensure no location is used for search
+            else:
+                # This is a direct user query, not a confirmation.
+                # Assess plausibility of the initially extracted 'location'.
+                if location: # If a location string was extracted by earlier regex
+                    loc_lower_check = location.lower()
+                    # List of phrases that, if the location starts with them or *is* them, indicate it's not a good search term
+                    question_or_general_indicators = [
+                        "what is", "what's", "how is", "how's", "tell me about", "can you tell me", 
+                        "information on", "situation", "report", "market", "update", "overview", "analysis", 
+                        "trends", "real estate", "homes in general in" 
+                    ]
+                    is_question_like_phrase = False
+                    for indicator in question_or_general_indicators:
+                        if loc_lower_check.startswith(indicator) or loc_lower_check == indicator:
+                            is_question_like_phrase = True
+                            break
+                    
+                    # Also consider overly long locations without structure (like a comma) as implausible
+                    is_too_long_or_unstructured = (
+                        (len(location.split()) > 7 and ',' not in location) or
+                        (len(location) > 60 and ',' not in location)
+                    )
+
+                    if is_question_like_phrase or is_too_long_or_unstructured:
+                        print(f"Extracted location '{location}' deemed not plausible for property search (question-like, too long, or unstructured). Discarding for search intent.")
+                        final_search_location = None # Discard this location for search decision
+                    else:
+                        # Location seems plausible enough to consider for a search
+                        print(f"Extracted location '{location}' deemed plausible for property search consideration.")
+                        # final_search_location remains 'location'
+                
+                # Now, decide if it's a property search based on refined location and other criteria
+                has_search_criteria = property_type or max_price or min_bathrooms
+                
+                # Keywords that strongly signal intent to search for properties when location might also be present
+                strong_intent_keywords = [
+                    "listings", "properties", "homes", "houses", "condos", "apartments",
+                    "for sale", "for rent", "buy", "purchase", "find", "search", "look for", "looking for"
+                ]
+                has_strong_intent_keywords_in_query = any(re.search(r'\b' + re.escape(keyword) + r'\b', content_lower, re.IGNORECASE) for keyword in strong_intent_keywords)
+
+                if final_search_location and (has_search_criteria or has_strong_intent_keywords_in_query):
+                    is_property_search = True
+                    print(f"Property search determined: Plausible location '{final_search_location}' AND (specific criteria OR strong intent keywords found in query).")
+                elif not final_search_location and (has_search_criteria or (property_type and has_strong_intent_keywords_in_query)):
+                    # E.g., "condos under $500k" (criteria, no location) or "find condos" (property_type + intent, no location)
+                    is_property_search = False # Let OpenAI prompt for location
+                    print(f"General query determined: Criteria/Property Type with intent present, but no plausible location. OpenAI to prompt.")
+                elif final_search_location and not (has_search_criteria or has_strong_intent_keywords_in_query):
+                    # E.g., user just types "Los Angeles" or "Tell me about Los Angeles".
+                    # Location is plausible, but no other property search signals.
+                    is_property_search = False # Treat as general question about the location.
+                    print(f"General query determined: Plausible location '{final_search_location}' found, but no other property search signals. OpenAI to handle.")
+                else:
+                    # Default to not a property search if none of the above conditions are met.
+                    is_property_search = False
+                    print(f"General query determined: No clear property search intent or insufficient/implausible parameters. Query: '{content_lower}'")
+            
+            # Update the original 'location' variable with the refined 'final_search_location'
+            # This ensures that if location was deemed implausible, it's None for the API call.
+            location = final_search_location 
+
+        # --- End of Original Regex-based Parameter Extraction --- (Comment seems misplaced from original, but logic ends here)
+        print(f"Final decision before API call: Location='{location}', PropertyType='{property_type}', MaxPrice='{max_price}', MinBathrooms='{min_bathrooms}', IsPropertySearch={is_property_search}")
+        
         is_valid_location_string = isinstance(location, str) and location.strip() != ""
 
         if is_valid_location_string and is_property_search: # location already stripped by this point if from regex
@@ -598,6 +667,7 @@ async def chat(chat_request: ChatRequest, request: Request):
             {"role": "system", "content": SYSTEM_MESSAGE},
             *[{"role": msg.role, "content": msg.content} for msg in chat_request.messages]
         ]
+        print(f"Falling back to OpenAI. is_valid_location_string: {is_valid_location_string}, is_property_search: {is_property_search}") # Added print for clarity
         openai_response = client.chat.completions.create(
             model=OPENAI_MODEL,
             messages=messages,
