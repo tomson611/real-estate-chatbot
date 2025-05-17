@@ -501,7 +501,6 @@ async def chat(chat_request: ChatRequest, request: Request):
                     property_type_keyword_found = kw 
                     print(f"Property type '{property_type}' found from keyword '{kw}'")
                     break
-            
             if not property_type: 
                 property_type_pattern_orig = r"(?:type|kind|style|a|an)\s+(condo|townhouse|single-family|house|apartment|multi-family|land)\b"
                 pt_match_regex = re.search(property_type_pattern_orig, content_lower)
@@ -511,40 +510,61 @@ async def chat(chat_request: ChatRequest, request: Request):
                     if property_type == "House": property_type = "Single-Family"
                     print(f"Property type '{property_type}' found from regex pattern for '{raw_pt}'.")
 
-            # 3. Extract Location
-            location_pattern = r"(?:in|near|at|around|for|search|looking for|show me)\s+((?:[a-zA-Z\s\-]+(?:,\s*[A-Z]{2})?)|(?:[a-zA-Z\s\-]+))(?=\s+(?:under|over|below|above|with|and|listings|properties|homes|condos|houses|apartments)|[?.!,]|$)|^((?:[a-zA-Z\s\-]+(?:,\s*[A-Z]{2})?)|(?:[a-zA-Z\s\-]+))\s*(?:listings|properties|homes|condos|houses|apartments)?"
-            location_match_user = re.search(location_pattern, content_lower)
+            # 3. Prepare content for location search by removing identified property type keyword
+            content_for_location_search = content_lower
+            if property_type_keyword_found:
+                # Replace only the first occurrence of the keyword to avoid overly stripping the query
+                content_for_location_search = re.sub(r'\b' + re.escape(property_type_keyword_found) + r'\b', '', content_for_location_search, count=1, flags=re.IGNORECASE).strip()
+                content_for_location_search = re.sub(r'\s\s+', ' ', content_for_location_search) # Normalize spaces
+                print(f"Content for location search after PT '{property_type_keyword_found}' removal: '{content_for_location_search}'")
+            else:
+                print(f"No property type keyword found, using original content for location search: '{content_for_location_search}'")
+
+            # 4. Extract Location from (potentially modified) content_for_location_search
+            # This pattern tries to find locations after prepositions or at the start of the query.
+            # It's designed to be less greedy now that property types are handled separately.
+            location_pattern = (
+                r"(?:in|near|at|around|for|search(?:ing for)?|looking for|show me)\s+"
+                r"((?:[a-zA-Z0-9\s\.,\-]+(?:,\s*[A-Z]{2})?)|(?:[a-zA-Z0-9\s\.,\-]+))"
+                r"(?=\s+(?:under|over|below|above|with|and|listings|properties|homes|that are)|[?.!,]|$)|"
+                r"^((?:[a-zA-Z0-9\s\.,\-]+(?:,\s*[A-Z]{2})?)|(?:[a-zA-Z0-9\s\.,\-]+))(?=\s|$)"
+            )
+            location_match_user = re.search(location_pattern, content_for_location_search, re.IGNORECASE)
             if location_match_user:
-                loc_str_group1 = location_match_user.group(1)
-                loc_str_group2 = location_match_user.group(2)
+                loc_str_group1 = location_match_user.group(1) # After preposition
+                loc_str_group2 = location_match_user.group(2) # At the start
                 potential_location = loc_str_group1 if loc_str_group1 else loc_str_group2
                 if potential_location:
-                    location = potential_location.strip().rstrip(',').strip()
-                    print(f"Initial location extracted: '{location}'")
-                    if property_type and property_type_keyword_found:
-                        if location.lower() == property_type_keyword_found.lower():
-                            location = None 
-                            print(f"Location was identical to property type keyword '{property_type_keyword_found}', reset to None.")
-                        elif location.lower().endswith(" " + property_type_keyword_found.lower()):
-                            location = location[:-(len(property_type_keyword_found) + 1)].strip()
-                            print(f"Location refined by removing suffix ' {property_type_keyword_found}': '{location}'")
+                    # Further cleanups for common non-location terms that might get caught if query is very conversational
+                    non_location_terms_at_start = ["show me", "find me", "search for", "can you find", "i'm looking for", "listings for", "properties for"]
+                    cleaned_location = potential_location.strip().rstrip(',').strip()
+                    for term in non_location_terms_at_start:
+                        if cleaned_location.lower().startswith(term.lower() + " "):
+                            cleaned_location = cleaned_location[len(term):].lstrip()
+                    if cleaned_location and cleaned_location.lower() not in (ptk.lower() for ptk in known_property_keywords_map.keys() if ptk):
+                        location = cleaned_location
+                        print(f"Location extracted from '{content_for_location_search}': '{location}'")
             
-            if not location and property_type_keyword_found and len(content_lower.split()) <= 5:
-                keyword_parts = re.split(r'(' + re.escape(property_type_keyword_found) + r')', content_lower, flags=re.IGNORECASE)
-                potential_loc_str = "".join([part for i, part in enumerate(keyword_parts) if i != 1 and part]).strip()
-                if potential_loc_str:
-                    words_to_remove = ["listings", "properties", "homes", "for", "sale", "show", "me", "find", "search", "looking", "a", "an", "in", "near", "at", "around", "of", "is", "are", "what", "how", "many", "the"]
-                    temp_loc_parts = [word for word in potential_loc_str.split() if word.lower() not in words_to_remove]
-                    final_inferred_loc = " ".join(temp_loc_parts).strip()
-                    if final_inferred_loc and final_inferred_loc.lower() != property_type_keyword_found.lower():
-                        location = final_inferred_loc
-                        print(f"Location inferred from remaining short query after PT removal: '{location}'")
+            # 5. Fallback: Location Inference for very short queries if still no location
+            if not location and property_type_keyword_found and len(content_lower.split()) <= 5: # Use original content_lower here
+                # Attempt to extract what's left after removing the property type keyword from the original short query
+                temp_loc_str = content_lower
+                temp_loc_str = re.sub(r'\b' + re.escape(property_type_keyword_found) + r'\b', '', temp_loc_str, flags=re.IGNORECASE).strip()
+                temp_loc_str = re.sub(r'\s*(?:in|near|at|around|for|listings|properties|homes)\s*', '', temp_loc_str, flags=re.IGNORECASE).strip()
+                temp_loc_str = re.sub(r'\s\s+', ' ', temp_loc_str)
+                if temp_loc_str and temp_loc_str.lower() != property_type_keyword_found.lower(): # Ensure it's not just the prop type again
+                    location = temp_loc_str
+                    print(f"Location inferred from short query '{content_lower}' after PT removal: '{location}'")
             
-            if location or property_type or max_price or min_bathrooms:
+            # 6. Determine if it's a property search
+            if location or property_type or max_price or min_bathrooms: # If any specific criteria is found
                 is_property_search = True
-            if not is_property_search:
-                property_intent_keywords = ["listings", "properties", "homes", "houses", "for sale", "buy", "purchase", "condo", "townhouse", "apartment", "rentcast"]
-                is_property_search = any(keyword in content_lower for keyword in property_intent_keywords)
+            if not is_property_search: # Fallback check for general property related keywords
+                property_intent_keywords = ["listings", "properties", "homes", "houses", "for sale", "buy", "purchase", "rentcast"]
+                # Add specific property types to intent keywords if not already covered by property_type extraction
+                property_intent_keywords.extend(known_property_keywords_map.keys())
+                is_property_search = any(re.search(r'\b' + re.escape(keyword) + r'\b', content_lower) for keyword in property_intent_keywords)
+            
             print(f"Final Parameters before RentCast: L='{location}', PT='{property_type}', B='{min_bathrooms}', P='{max_price}', IsSearch={is_property_search}")
 
         if location and is_property_search:
