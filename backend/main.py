@@ -72,19 +72,16 @@ For mortgage calculations:
 7. Keep all text on a single line, do not split numbers across multiple lines.
 8. Include important context about what the calculation includes/excludes (e.g., property taxes, insurance, PMI).
 9. Example of correct format:
-   "Based on your inputs:
-   Loan Amount: $300,000
-   Interest Rate: 3%
-   Loan Term: 25 years
-   Down Payment: $0
-   
-   Your estimated monthly payment would be: $1,425.20
-   
-   Additional details:
-   Total payment over loan term: $427,560.00
-   Total interest paid: $127,560.00
-   
-   Note: This calculation does not include property taxes, homeowners insurance, or PMI if applicable."
+   "Based on your inputs:\\n"
+   "Loan Amount: $300,000\\n"
+   "Interest Rate: 3%\\n"
+   "Loan Term: 25 years\\n"
+   "Down Payment: $0\\n\\n"
+   "Your estimated monthly payment would be: $1,425.20\\n\\n"
+   "Additional details:\\n"
+   "Total payment over loan term: $427,560.00\\n"
+   "Total interest paid: $127,560.00\\n\\n"
+   "Note: This calculation does not include property taxes, homeowners insurance, or PMI if applicable."
 
 Additional guidelines:
 1. Always prioritize the user's needs and financial well-being.
@@ -445,9 +442,6 @@ async def chat(chat_request: ChatRequest, request: Request):
         is_property_search: bool = False
         
         # --- Start of LLM-based Parameter Extraction ---
-        # Ensure last_user_message.content is properly escaped if it contains quotes, for the f-string.
-        # Python's f-string will handle escaping of the content itself if it's a variable.
-        # The quotes around JSON examples need to be \\'\\''\\' or escaped if the outer f-string uses ".
         parameter_extraction_prompt = f'''Extract the following parameters from the user\\'s message for a real estate property search:
 - location (string, e.g., "San Francisco, CA", "downtown Austin")
 - property_type (string, one of: "Single-Family", "Condo", "Townhouse", "Multi-Family", "Apartment", "Land")
@@ -576,8 +570,8 @@ Example response for "Tell me about the weather":
         response_text = re.sub(r'<[^>]+>', '', response_text)
         response_text = re.sub(r'\n\n+', '\n\n', response_text)
         response_text = re.sub(r' +', ' ', response_text)
-        response_text = re.sub(r'^\s*\{\s*"text"\s*:\s*"', '', response_text)
-        response_text = re.sub(r'"\s*\}\s*$', '', response_text)
+        response_text = re.sub(r'^\\s*\\{\\s*"text"\\s*:\\s*"', '', response_text)
+        response_text = re.sub(r'"\\s*}\\s*$', '', response_text)
         
         return {"response": {"text": response_text}}
 
