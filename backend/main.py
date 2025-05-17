@@ -404,10 +404,10 @@ async def chat(chat_request: ChatRequest, request: Request):
                         f"Interest Rate: {interest_rate}%\\n"
                         f"Loan Term: {loan_term} years\\n"
                         f"Down Payment: $0.00\\n\\n"
-                        f"Your estimated monthly payment would be: ${{{result['monthly_payment']:,.2f}}}\\n\\n"
+                        f"Your estimated monthly payment would be: ${result['monthly_payment']:,.2f}\\n\\n"
                         f"Additional details:\\n"
-                        f"Total payment over loan term: ${{{result['total_payment']:,.2f}}}\\n"
-                        f"Total interest paid: ${{{result['total_interest']:,.2f}}}\\n\\n"
+                        f"Total payment over loan term: ${result['total_payment']:,.2f}\\n"
+                        f"Total interest paid: ${result['total_interest']:,.2f}\\n\\n"
                         f"Note: This calculation does not include property taxes, homeowners insurance, or PMI if applicable."
                     )
                     response_text = re.sub(r'<[^>]+>', '', response_text)
@@ -447,27 +447,27 @@ async def chat(chat_request: ChatRequest, request: Request):
         # --- Start of LLM-based Parameter Extraction ---
         parameter_extraction_prompt = (
             f"Extract the following parameters from the user's message for a real estate property search:\\n"
-            f"- location (string, e.g., \"San Francisco, CA\", \"downtown Austin\")\\n"
-            f"- property_type (string, one of: \"Single-Family\", \"Condo\", \"Townhouse\", \"Multi-Family\", \"Apartment\", \"Land\")\\n"
+            f"- location (string, e.g., \\"San Francisco, CA\\", \\"downtown Austin\\")\\n"
+            f"- property_type (string, one of: \\"Single-Family\\", \\"Condo\\", \\"Townhouse\\", \\"Multi-Family\\", \\"Apartment\\", \\"Land\\")\\n"
             f"- max_price (float, e.g., 500000.0)\\n"
             f"- min_bathrooms (float, e.g., 2.0 or 2.5)\\n\\n"
-            f"User message: \"{last_user_message.content}\"\\n\\n"
+            f"User message: \\"{last_user_message.content}\\"\\n\\n"
             f"Respond ONLY with a JSON object containing the extracted parameters.\\n"
             f"If a parameter is not mentioned, omit it or set its value to null.\\n"
-            f"Example response for \"Show me condos in Seattle under $700k with at least 2 baths\":\\n"
-            f"{{{{\\n"
-            f"  \"location\": \"Seattle\",\\n"
-            f"  \"property_type\": \"Condo\",\\n"
-            f"  \"max_price\": 700000.0,\\n"
-            f"  \"min_bathrooms\": 2.0\\n"
-            f"}}}}\\n"
-            f"Example response for \"apartments in los angeles\":\\n"
-            f"{{{{\\n"
-            f"  \"location\": \"los angeles\",\\n"
-            f"  \"property_type\": \"Apartment\"\\n"
-            f"}}}}\\n"
-            f"Example response for \"Tell me about the weather\":\\n"
-            f"{{{{}}}}"
+            f"Example response for \\"Show me condos in Seattle under $700k with at least 2 baths\\":\\n"
+            f"{{{{\\n"  # Escaped curly braces for literal output
+            f"  \\"location\\": \\"Seattle\\",\\n"
+            f"  \\"property_type\\": \\"Condo\\",\\n"
+            f"  \\"max_price\\": 700000.0,\\n"
+            f"  \\"min_bathrooms\\": 2.0\\n"
+            f"}}}}\\n" # Escaped curly braces for literal output
+            f"Example response for \\"apartments in los angeles\\":\\n"
+            f"{{{{\\n"  # Escaped curly braces for literal output
+            f"  \\"location\\": \\"los angeles\\",\\n"
+            f"  \\"property_type\\": \\"Apartment\\"\\n"
+            f"}}}}\\n" # Escaped curly braces for literal output
+            f"Example response for \\"Tell me about the weather\\":\\n"
+            f"{{{{}}}}"  # Escaped curly braces for literal output
         )
         try:
             print("Attempting LLM parameter extraction...")
@@ -571,12 +571,11 @@ async def chat(chat_request: ChatRequest, request: Request):
         )
         response_text = openai_response.choices[0].message.content
         response_text = re.sub(r'<[^>]+>', '', response_text)
-        response_text = re.sub(r'\\n\\n+', '\\n\\n', response_text)
+        response_text = re.sub(r'\n\n+', '\n\n', response_text)
         response_text = re.sub(r' +', ' ', response_text)
-        response_text = re.sub(r'^\\s*{\\s*"text"\\s*:\\s*"', '', response_text) 
-        response_text = re.sub(r'"\\s*}\\s*$', '', response_text)
+        response_text = re.sub(r'^\s*\{\s*"text"\s*:\s*"', '', response_text)
+        response_text = re.sub(r'"\s*\}\s*$', '', response_text)
         
-        # Ensure response is just text if no properties
         return {"response": {"text": response_text}}
 
     except Exception as e:
