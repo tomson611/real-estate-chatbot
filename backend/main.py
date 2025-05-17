@@ -674,12 +674,18 @@ async def chat(chat_request: ChatRequest, request: Request):
             temperature=0.7
         )
         response_text = openai_response.choices[0].message.content
-        # CORRECTED re.sub calls:
-        response_text = re.sub(r'<[^>]+>', '', response_text)
-        response_text = re.sub(r'\n\n+', r'\n\n', response_text) 
-        response_text = re.sub(r' +', ' ', response_text)
-        response_text = re.sub(r'^\s*\{\s*"text"\s*:\s*"', '', response_text)
-        response_text = re.sub(r'"\s*\}\s*$', '', response_text)
+        
+        # Text cleaning and normalization
+        response_text = re.sub(r'<[^>]+>', '', response_text) # Strip HTML tags
+        response_text = re.sub(r'^\s*\{\s*"text"\s*:\s*"', '', response_text) # Strip JSON-like prefix
+        response_text = re.sub(r'"\s*\}\s*$', '', response_text) # Strip JSON-like suffix
+        
+        # Remove malformed list items like "0. 0" or "1." on their own lines
+        response_text = re.sub(r"^\s*\d+\.\s*(\d+\s*)?$", "", response_text, flags=re.MULTILINE)
+        
+        response_text = re.sub(r'\n\n+', r'\n\n', response_text) # Normalize multiple newlines to double newlines
+        response_text = re.sub(r' +', ' ', response_text) # Collapse multiple spaces to a single space
+        response_text = response_text.strip() # Remove leading/trailing whitespace from the entire response
         
         return {"response": {"text": response_text}}
 
