@@ -425,8 +425,7 @@ Note: This calculation does not include property taxes, homeowners insurance, or
                     
                     return {
                         "response": {
-                            "text": response_text,
-                            "properties": []
+                            "text": response_text
                         }
                     }
                 else:
@@ -531,8 +530,7 @@ Note: This calculation does not include property taxes, homeowners insurance, or
         
         return {
             "response": {
-                "text": response_text,
-                "properties": []
+                "text": response_text
             }
         }
     except Exception as e:
