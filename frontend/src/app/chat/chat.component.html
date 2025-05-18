@@ -7,7 +7,7 @@
           <div class="property-grid">
             <div class="property-card" 
                  *ngFor="let property of message.content.properties" 
-                 (click)="viewPropertyDetails(property)">
+                 (click)="onPropertyClick(property)">
               <div class="property-details">
                 <h3>{{ property.address }}</h3>
                 <p class="price">{{ property.price }}</p>
