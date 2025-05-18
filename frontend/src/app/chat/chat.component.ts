@@ -1,18 +1,19 @@
-import { Component, OnInit, ViewChild, ElementRef, AfterViewChecked } from '@angular/core';
+import { Component, OnInit, ViewChild, ElementRef, AfterViewChecked, ChangeDetectorRef } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Router, ActivatedRoute } from '@angular/router';
 import { Property } from '../models/property.interface';
 import { ApiService } from '../services/api.service';
+import { PropertyDetailService } from '../services/property-detail.service';
 
-interface Message {
-  role: string;
-  content: string | any;
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: any;
 }
 
 interface ChatResponse {
   response: {
     text: string;
-    properties?: Property[];
+    properties?: any[];
   };
 }
 
@@ -23,8 +24,8 @@ interface ChatResponse {
 })
 export class ChatComponent implements OnInit, AfterViewChecked {
   @ViewChild('messagesContainer') private messagesContainer!: ElementRef;
-  messages: Message[] = [];
-  displayMessages: Message[] = [];
+  messages: ChatMessage[] = [];
+  displayMessages: ChatMessage[] = [];
   newMessage: string = '';
   isLoading: boolean = false;
   lastMessageTime: number = 0;
@@ -34,7 +35,9 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     private http: HttpClient,
     private router: Router,
     private route: ActivatedRoute,
-    private apiService: ApiService
+    private apiService: ApiService,
+    private propertyDetailService: PropertyDetailService,
+    private cdr: ChangeDetectorRef
   ) {}
 
   ngOnInit() {
@@ -55,40 +58,18 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   }
 
   formatText(text: string): string {
-    // First handle bold text
-    text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
-    
-    // Replace \n\n with actual newlines
-    text = text.replace(/\\n\\n/g, '\n\n');
-    
-    // Split into paragraphs first
-    const paragraphs = text.split(/(?:\r?\n){2,}/);
-    
-    return paragraphs.map(paragraph => {
-      // Check if this paragraph contains a numbered list
-      if (paragraph.match(/\d+\.\s+/)) {
-        // Split the initial text from the list
-        const [intro, ...listItems] = paragraph.split(/(?=\d+\.\s+)/);
-        
-        // Format the list items
-        const formattedList = listItems.map(item => {
-          const [number] = item.match(/\d+/) || [''];
-          return `<div class="list-item">
-            <span class="number">${number}.</span>
-            <span class="content">${item.replace(/^\d+\.\s+/, '')}</span>
-          </div>`;
-        }).join('');
+    // Convert markdown-like lists to HTML lists
+    let formattedText = text.replace(/\n\n/g, '<br><br>'); // Handle double newlines for paragraphs
+    formattedText = formattedText.replace(/\n/g, '<br>'); // Handle single newlines
 
-        // Combine intro and list
-        return `<p>${intro || ''}</p>
-          <div class="numbered-list">
-            ${formattedList}
-          </div>`;
-      }
-      
-      // Regular paragraph
-      return `<p>${paragraph}</p>`;
-    }).join('');
+    // Convert numbered lists
+    formattedText = formattedText.replace(/(\d+\.\s.*?)(\n(?!\d+\.|$)|$)/g, '<li>$1</li>');
+    formattedText = formattedText.replace(/(<li>.*?<\/li>)+/g, '<ol>$&</ol>');
+
+    // Convert bulleted lists (if any, though system prompt emphasizes numbered)
+    // formattedText = formattedText.replace(/\*\s(.*?)\n/g, '<li>$1</li>');
+    // formattedText = formattedText.replace(/(<li>.*?<\/li>)+/g, '<ul>$&</ul>');
+    return formattedText;
   }
 
   canSendMessage(): boolean {
@@ -100,7 +81,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     if (!this.newMessage.trim() || !this.canSendMessage()) return;
 
     this.lastMessageTime = Date.now();
-    const userMessage: Message = {
+    const userMessage: ChatMessage = {
       role: 'user',
       content: this.newMessage
     };
@@ -115,69 +96,44 @@ export class ChatComponent implements OnInit, AfterViewChecked {
     }));
 
     const payload = { messages: formattedMessages };
-    console.log('Sending to backend:', payload);
-    console.log('Using API URL:', this.apiService.getApiUrl());
 
     this.http.post<ChatResponse>(`${this.apiService.getApiUrl()}/chat`, payload)
       .subscribe({
         next: (response: ChatResponse | null) => {
-          if (!response) {
-            console.error('Received null or undefined response from backend');
-            const errorMessage = {
+          this.isLoading = false;
+          if (!response || !response.response) {
+            const errorMessage: ChatMessage = {
               role: 'assistant',
               content: 'Sorry, I received an empty response from the server. Please try again.'
             };
+            this.messages.push(errorMessage);
             this.displayMessages.push(errorMessage);
-            this.isLoading = false;
             return;
           }
 
-          console.log('Raw response from backend:', response);
-          
-          if (response.response) {
-            console.log('Response.response:', response.response);
-            
-            const assistantMessage = {
-              role: 'assistant',
-              content: response.response
-            };
-            
-            console.log('Formatted assistant message:', assistantMessage);
-            this.messages.push(assistantMessage);
-            this.displayMessages.push(assistantMessage);
-          } else {
-            console.error('Unexpected response format. Full response:', response);
-            console.error('Expected format example:', {
-                response: {
-                    text: "Example response text",
-                    properties: [{
-                        address: "123 Example St",
-                        price: "$500,000",
-                        beds: 3,
-                        baths: 2,
-                        sqft: "2,000",
-                        description: "Example property description"
-                    }]
-                }
-            });
-            const errorMessage = {
-              role: 'assistant',
-              content: 'Sorry, I received an unexpected response format. Please try again.'
-            };
-            this.displayMessages.push(errorMessage);
-          }
-          this.isLoading = false;
+          const assistantMessageContent = response.response.text;
+          const properties = response.response.properties;
+
+          const assistantMessage: ChatMessage = {
+            role: 'assistant',
+            content: properties && properties.length > 0 ? { text: assistantMessageContent, properties: properties } : assistantMessageContent
+          };
+
+          this.messages.push(assistantMessage);
+          this.displayMessages.push(assistantMessage);
+          this.cdr.detectChanges();
+          this.scrollToBottom();
         },
         error: (error: any) => {
-          console.error('Error details:', error);
-          console.error('Error response:', error.error);
-          console.error('Error status:', error.status);
-          const errorMessage = {
+          this.isLoading = false;
+          const errorMessage: ChatMessage = {
             role: 'assistant',
             content: 'Sorry, I encountered an error. Please try again.'
           };
+          this.messages.push(errorMessage);
           this.displayMessages.push(errorMessage);
-          this.isLoading = false;
+          this.cdr.detectChanges();
+          this.scrollToBottom();
         }
       });
 
@@ -185,41 +141,45 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   }
 
   isPropertyListing(content: any): boolean {
-    console.log('Checking if content is property listing:', content);
-    return content && 
-           typeof content === 'object' && 
-           'properties' in content && 
-           Array.isArray(content.properties) && 
+    return content &&
+           typeof content === 'object' &&
+           'properties' in content &&
+           Array.isArray(content.properties) &&
            content.properties.length > 0;
   }
 
   getMessageText(content: any): string {
-    console.log('Getting message text from:', content);
     if (typeof content === 'string') {
       return this.formatText(content);
-    } else if (content && typeof content === 'object') {
-      return this.formatText(content.text || '');
+    } else if (content && typeof content === 'object' && content.text) {
+      return this.formatText(content.text);
     }
     return '';
   }
 
-  viewPropertyDetails(property: Property) {
-    console.log('Property clicked:', property);
-    try {
-      console.log('Navigating to property details');
-      this.router.navigate(['/property-details'], { 
-        state: { property }
-      }).then(success => {
-        console.log('Navigation success:', success);
-      }).catch(error => {
-        console.error('Navigation error:', error);
-      });
-    } catch (error) {
-      console.error('Error in viewPropertyDetails:', error);
+  getProperties(content: any): any[] {
+    if (this.isPropertyListing(content)) {
+      return content.properties;
     }
+    return [];
   }
 
-  logClick() {
-    console.log('Card clicked');
+  onPropertyClick(property: any): void {
+    this.propertyDetailService.setSelectedProperty(property);
+    this.router.navigate(['/property-detail'])
+      .then((success: boolean) => {
+        // if (success) {
+        //   // console.log('Navigation success:', success);
+        // } else {
+        //   // console.error('Navigation failed');
+        // }
+      })
+      .catch((err: any) => {
+        // console.error('Navigation error:', err);
+      });
+  }
+
+  onCardClick(event: Event) {
+    // console.log('Card clicked');
   }
 } 

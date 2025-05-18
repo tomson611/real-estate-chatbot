@@ -203,7 +203,8 @@ def get_rentcast_data(location: str, max_price: Optional[float] = None, property
                 "san antonio": "TX",
                 "san diego": "CA",
                 "dallas": "TX",
-                "vallejo": "CA"
+                "vallejo": "CA",
+                "orange county": "CA"  # Added Orange County
             }
             state = city_state_map.get(city.lower())
             formatted_location = f"{city}, {state}" if state else city
@@ -453,21 +454,50 @@ async def chat(chat_request: ChatRequest, request: Request):
             potential_assistant_message = chat_request.messages[-2]
             if potential_assistant_message.role == "assistant":
                 assistant_confirmation_text = potential_assistant_message.content
-                # CORRECTED REGEX patterns:
-                loc_match_assist = re.search(r"Location:\s*([^\n]+)", assistant_confirmation_text, re.IGNORECASE)
-                pt_match_assist = re.search(r"Property Type:\s*([^\n]+)", assistant_confirmation_text, re.IGNORECASE)
-                bath_match_assist = re.search(r"Number of Bathrooms:\s*(\d+(?:\.\d+)?)", assistant_confirmation_text, re.IGNORECASE)
-                price_match_assist = re.search(r"Maximum Price:\s*\$?([0-9,]+(?:\.\d{1,2})?)", assistant_confirmation_text, re.IGNORECASE)
+                print(f"Attempting to parse from assistant confirmation: {assistant_confirmation_text}") # Debug print
+
+                # More robust regexes for parsing assistant's confirmation
+                loc_match_assist = re.search(r"(?:Location|Area|City):\s*([^\n]+)", assistant_confirmation_text, re.IGNORECASE)
+                pt_text_match_assist = re.search(r"(?:Property Type|Looking for|Type):\s*([^\n]+)", assistant_confirmation_text, re.IGNORECASE)
+                bath_match_assist = re.search(r"(?:Bathrooms|Number of Bathrooms):\s*(\d+(?:\.\d+)?)", assistant_confirmation_text, re.IGNORECASE)
+                price_match_assist = re.search(r"(?:Price Range|Maximum Price|Price):\s*(?:Under|Up to|Less than|Around)?\s*\$?([0-9,]+(?:\.\d{1,2})?)", assistant_confirmation_text, re.IGNORECASE)
 
                 if loc_match_assist: location = loc_match_assist.group(1).strip()
-                if pt_match_assist: property_type = pt_match_assist.group(1).strip().capitalize()
+                
+                if pt_text_match_assist:
+                    raw_pt_str = pt_text_match_assist.group(1).strip().lower()
+                    parsed_canonical_pt = None
+                    # Ensure known_property_keywords_map is accessible here or defined if not already
+                    # sorted_keywords = sorted(known_property_keywords_map.keys(), key=len, reverse=True) # Assuming known_property_keywords_map is defined earlier
+                    # For now, let's use a simplified local map for assistant parsing to RentCast types
+                    # This map should ideally be comprehensive and align with RentCast enums
+                    assistant_pt_to_rentcast_map = {
+                        "apartment": "Condo",  # Assuming apartments for sale are condos
+                        "condo": "Condo",
+                        "house": "Single-Family",
+                        "single-family": "Single-Family",
+                        "townhouse": "Townhouse",
+                        "multi-family": "Multi-Family",
+                        "land": "Land"
+                    }
+                    # Try to map common terms found in the assistant's description
+                    for keyword, rentcast_type in assistant_pt_to_rentcast_map.items():
+                        if keyword in raw_pt_str:
+                            property_type = rentcast_type # This is the RentCast valid type
+                            break
+                    if not property_type and raw_pt_str: # if still no property_type but raw_pt_str exists
+                        print(f"Could not map assistant property type '{raw_pt_str}' to a known RentCast type. Clearing property_type.")
+                        property_type = None # Clear it if no valid mapping to avoid sending invalid enum
+
                 if bath_match_assist: min_bathrooms = float(bath_match_assist.group(1))
                 if price_match_assist: max_price = float(price_match_assist.group(1).replace(',', ''))
                 
-                if location:
+                if location: # If a location was successfully parsed from assistant
                     is_property_search = True
                     parsed_from_assistant = True
-                    print(f"Parameters parsed from assistant confirmation: L='{location}', PT='{property_type}', B='{min_bathrooms}', P='{max_price}'")
+                    print(f"Parameters PARSED from ASSISTANT confirmation: L='{location}', PT='{property_type}', B='{min_bathrooms}', P='{max_price}', IsSearch={is_property_search}")
+                else:
+                    print("No location found in assistant confirmation message.")
 
         if not parsed_from_assistant:
             content_lower = last_user_message.content.lower()
