@@ -31,6 +31,8 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   lastMessageTime: number = 0;
   cooldownPeriod: number = 2000; // 2 seconds cooldown
 
+  private readonly chatStorageKey = 'chatMessages';
+
   constructor(
     private http: HttpClient,
     private router: Router,
@@ -41,10 +43,15 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   ) {}
 
   ngOnInit() {
-    this.displayMessages.push({
-      role: 'assistant',
-      content: 'Hello! I am your real estate assistant. I can help you with property information, mortgage calculations, and market trends. How can I assist you today?'
-    });
+    this.loadMessages();
+    if (this.messages.length === 0) { // Or displayMessages, depending on logic
+      const initialMessage = {
+        role: 'assistant' as const,
+        content: 'Hello! I am your real estate assistant. I can help you with property information, mortgage calculations, and market trends. How can I assist you today?'
+      };
+      this.messages.push(initialMessage);
+      this.displayMessages.push(initialMessage); // Ensure displayMessages also gets this
+    }
   }
 
   ngAfterViewChecked() {
@@ -88,6 +95,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
     this.messages.push(userMessage);
     this.displayMessages.push(userMessage);
+    this.saveMessages(); // Save after adding user message
     this.isLoading = true;
 
     const formattedMessages = this.messages.map(msg => ({
@@ -108,6 +116,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
             };
             this.messages.push(errorMessage);
             this.displayMessages.push(errorMessage);
+            this.saveMessages(); // Save after adding error message
             return;
           }
 
@@ -121,6 +130,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
           this.messages.push(assistantMessage);
           this.displayMessages.push(assistantMessage);
+          this.saveMessages(); // Save after adding assistant message
           this.cdr.detectChanges();
           this.scrollToBottom();
         },
@@ -132,6 +142,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
           };
           this.messages.push(errorMessage);
           this.displayMessages.push(errorMessage);
+          this.saveMessages(); // Save after adding error message
           this.cdr.detectChanges();
           this.scrollToBottom();
         }
@@ -181,5 +192,30 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
   onCardClick(event: Event) {
     // console.log('Card clicked');
+  }
+
+  private saveMessages(): void {
+    try {
+      localStorage.setItem(this.chatStorageKey, JSON.stringify(this.messages));
+    } catch (e) {
+      console.error('Error saving messages to localStorage', e); // Keep console.error for debugging
+    }
+  }
+
+  private loadMessages(): void {
+    try {
+      const savedMessages = localStorage.getItem(this.chatStorageKey);
+      if (savedMessages) {
+        this.messages = JSON.parse(savedMessages);
+        // Assuming displayMessages should be a direct copy or derived from messages.
+        // If displayMessages undergoes transformations not captured just by copying,
+        // this logic might need to be more complex, or save/load displayMessages too.
+        this.displayMessages = [...this.messages];
+      }
+    } catch (e) {
+      console.error('Error loading messages from localStorage', e); // Keep console.error for debugging
+      this.messages = [];
+      this.displayMessages = [];
+    }
   }
 } 
