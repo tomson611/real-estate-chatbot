@@ -20,7 +20,7 @@
       </ng-container>
       <div *ngIf="!isPropertyListing(message.content)" [innerHTML]="getMessageText(message.content)" class="message-text"></div>
     </div>
-    <div *ngIf="isLoading" class="loading">Thinking</div>
+    <div *ngIf="isLoading" class="loading"></div>
   </div>
   
   <div class="input-container">
