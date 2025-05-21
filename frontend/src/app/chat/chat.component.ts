@@ -178,27 +178,17 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   onPropertyClick(property: any): void {
     this.propertyDetailService.setSelectedProperty(property);
     this.router.navigate(['/property-detail'])
-      .then((success: boolean) => {
-        // if (success) {
-        //   // console.log('Navigation success:', success);
-        // } else {
-        //   // console.error('Navigation failed');
-        // }
-      })
-      .catch((err: any) => {
-        // console.error('Navigation error:', err);
-      });
+      .then((success: boolean) => {})
+      .catch((err: any) => {});
   }
 
-  onCardClick(event: Event) {
-    // console.log('Card clicked');
-  }
+  onCardClick(event: Event) {}
 
   private saveMessages(): void {
     try {
       localStorage.setItem(this.chatStorageKey, JSON.stringify(this.messages));
     } catch (e) {
-      console.error('Error saving messages to localStorage', e); // Keep console.error for debugging
+      console.error('Error saving messages to localStorage', e);
     }
   }
 
@@ -207,13 +197,10 @@ export class ChatComponent implements OnInit, AfterViewChecked {
       const savedMessages = localStorage.getItem(this.chatStorageKey);
       if (savedMessages) {
         this.messages = JSON.parse(savedMessages);
-        // Assuming displayMessages should be a direct copy or derived from messages.
-        // If displayMessages undergoes transformations not captured just by copying,
-        // this logic might need to be more complex, or save/load displayMessages too.
         this.displayMessages = [...this.messages];
       }
     } catch (e) {
-      console.error('Error loading messages from localStorage', e); // Keep console.error for debugging
+      console.error('Error loading messages from localStorage', e);
       this.messages = [];
       this.displayMessages = [];
     }
