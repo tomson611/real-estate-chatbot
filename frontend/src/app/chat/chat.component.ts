@@ -176,10 +176,11 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   }
 
   onPropertyClick(property: any): void {
-    this.propertyDetailService.setSelectedProperty(property);
-    this.router.navigate(['/property-detail'])
-      .then((success: boolean) => {})
-      .catch((err: any) => {});
+    this.router.navigate(['/property-details'], { 
+      state: { property: property }
+    })
+    .then((success: boolean) => {})
+    .catch((err: any) => {});
   }
 
   onCardClick(event: Event) {}
