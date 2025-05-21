@@ -203,4 +203,24 @@ button:disabled {
   color: #4a5568;
   font-size: 0.9em;
   margin-top: 12px;
+}
+
+@media screen and (max-width: 768px) {
+  .property-grid {
+    grid-template-columns: 1fr;
+    max-width: 100%;
+  }
+
+  .property-card {
+    width: 100%;
+    margin: 0 auto;
+  }
+
+  .chat-container {
+    padding: 10px;
+  }
+
+  .messages-container {
+    padding: 10px;
+  }
 } 
