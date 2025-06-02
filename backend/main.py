@@ -634,13 +634,18 @@ async def chat(chat_request: ChatRequest, request: Request):
                     if final_property_type: search_criteria_summary += f", property type: '{final_property_type}'"
                     if final_min_bedrooms: search_criteria_summary += f", bedrooms: {final_min_bedrooms}"
                     if final_min_bathrooms: search_criteria_summary += f", bathrooms: {final_min_bathrooms}"
-                    if final_max_price: search_criteria_summary += f", max price: ${final_max_price:,.0f}"
+                    parsed_price_for_summary = f"${final_max_price:,.0f}" if final_max_price is not None else "not specified"
+                    if final_max_price is not None: search_criteria_summary += f", max price: {parsed_price_for_summary}"
                     
                     no_results_prompt_for_ai = (
-                        "A specific property search for {" + search_criteria_summary + "} was performed but yielded no direct listings from the database. "
-                        "Please inform the user empathetically that no exact matches were found for these criteria. "
-                        "Then, proactively suggest they broaden their search (e.g., by adjusting price, location details, number of bedrooms/bathrooms, or property type) or ask if they'd like to try a different search strategy. "
-                        "Avoid just saying 'no results'. Offer constructive next steps."
+                        f"A property search was performed using criteria interpreted from the user's input. "
+                        f"The key criterion for price in this search was a maximum of {parsed_price_for_summary}. "
+                        f"The full search criteria were: {{{search_criteria_summary}}}. "
+                        f"This search (for max price {parsed_price_for_summary} and other criteria) yielded no direct listings. "
+                        f"Follow these steps in your response: "
+                        f"1. Inform the user that no listings were found for their request when interpreted with a maximum price of {parsed_price_for_summary} and the other specified criteria. Be empathetic. "
+                        f"2. Retrieve the user's *exact original phrasing for the price* from their last message in the conversation history. If this original phrasing seems like it could have reasonably meant a *different* monetary amount than {parsed_price_for_summary} (e.g., due to unusual comma placement or typos), then briefly state their original phrasing (e.g., 'Your input for price was \"[user's original price text]\".') and ask them to clarify their intended budget. Do NOT speculate on what they might have meant beyond asking for this clarification. "
+                        f"3. Then, suggest ways to broaden the search based on the *actually searched criteria* (e.g., adjusting the price from {parsed_price_for_summary}, changing the number of bedrooms/bathrooms, property type, or location details)."
                     )
                     messages_for_openai.append({"role": "system", "content": no_results_prompt_for_ai})
             
@@ -695,17 +700,20 @@ async def chat(chat_request: ChatRequest, request: Request):
 def test_rentcast_api():
     """Test function to check RentCast API response structure"""
     try:
-        # Test parameters
-        test_location = "Chicago, IL"  # Changed location to get fresh data
-        test_max_price = 500000
-        test_property_type = "Condo"
-        test_min_bedrooms = 2
-        test_min_bathrooms = 1
+        # Test parameters from user query
+        test_location = "Los Angeles, CA"
+        test_max_price = 800000.00
+        test_property_type = "Condo"  # "apartments" maps to "Condo"
+        test_min_bedrooms = 5
+        test_min_bathrooms = 3
         
-        # Force a fresh API call by using a unique cache key
-        cache_key = f"test_{test_location}_{test_max_price}_{test_property_type}_{test_min_bedrooms}_{test_min_bathrooms}"
-        
-        # Get data from API
+        print(f"\n--- Running test_rentcast_api with User Criteria ---")
+        print(f"Location: {test_location}, Max Price: {test_max_price}, Property Type: {test_property_type}, Beds: {test_min_bedrooms}, Baths: {test_min_bathrooms}")
+
+        # Cache is usually hit here if params are same, but for testing specific API response, 
+        # direct call or unique cache key might be needed if issues persist.
+        # For now, let get_rentcast_data handle its caching logic.
+
         properties = get_rentcast_data(
             location=test_location,
             max_price=test_max_price,
@@ -715,16 +723,16 @@ def test_rentcast_api():
         )
         
         if properties:
-            print("\nTest API Call Results:")
+            print("\nTest API Call Results (User Criteria):")
             print(f"Number of properties returned: {len(properties)}")
             print("\nFirst property fields:")
             for key, value in properties[0].items():
                 print(f"{key}: {value}")
         else:
-            print("No properties returned from test API call")
+            print("No properties returned from test API call with user criteria.")
             
     except Exception as e:
-        print(f"Error in test API call: {str(e)}")
+        print(f"Error in test_rentcast_api (user criteria): {str(e)}")
 
 if __name__ == "__main__":
     # To test async functions, you'd typically use asyncio.run()
