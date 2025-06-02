@@ -432,13 +432,26 @@ def map_property_type_to_rentcast(pt_string: Optional[str]) -> Optional[str]:
 async def extract_search_parameters_with_ai(messages_history: List[Dict[str, str]]) -> Dict[str, Any]:
     print("Attempting to extract search parameters with AI...")
     # Prepare a concise history, focusing on user and assistant messages
-    extraction_prompt_messages = [{"role": "system", "content": """You are a parameter extraction assistant. Given the conversation history, identify the user's desired search criteria for real estate. Extract: location (city and state if possible, e.g., 'Los Angeles, CA'), property_type (e.g., 'house', 'condo'), min_bedrooms (integer), min_bathrooms (float, e.g., 1.5), and max_price (float). Respond ONLY with a JSON object containing these fields. If a field is not mentioned, omit it or set its value to null. Example: {\"location\": \"Los Angeles, CA\", \"property_type\": \"condo\", \"min_bedrooms\": 2, \"max_price\": 1000000}"""}]
+    extraction_prompt_messages = [{"role": "system", "content": """You are a parameter extraction assistant. Your goal is to identify the user's desired search criteria for real estate based on the ENTIRE conversation history provided. 
+Extract the following, if available:
+- location (city and state, e.g., 'Los Angeles, CA')
+- property_type (e.g., 'house', 'condo', 'apartment')
+- min_bedrooms (integer)
+- min_bathrooms (float, e.g., 1.5)
+- max_price (float)
+
+Instructions:
+1. Prioritize the most recent explicit user statements for criteria.
+2. If the user provides a new location, use that. If they don't specify a location in their latest message but one was clearly established and searched for earlier in the conversation (e.g., a search for 'Boulder' just failed), and their latest message is a general request to search (e.g., 'show me anything', 'try again'), then RE-USE THE LAST ESTABLISHED LOCATION.
+3. If the user asks to broaden a search or try again after a failed search for specific criteria, try to retain the last location and other criteria unless they explicitly change them. If they say something like 'show me anything in Boulder', then use Boulder and try to find other criteria from the history.
+4. If essential parameters like location are missing and cannot be reliably inferred from history, set them to null.
+5. Respond ONLY with a single JSON object containing these fields. Omit fields or set their values to null if they are not mentioned or cannot be reliably determined. 
+Example: {"location": "Boulder, CO", "property_type": "apartment", "min_bedrooms": 3, "min_bathrooms": 2.0, "max_price": 500000.0}
+If only a location is clear: {"location": "Boulder, CO", "property_type": null, ...}
+If the user says 'show me anything' after a failed search for 'Boulder listings': {"location": "Boulder, CO"} (and try to pick up other prior criteria if sensible)."""}]
 
     # Add relevant parts of the conversation history for the AI to parse
-    # This can be optimized, but for now, let's use the last few messages
-    # or a summary of the conversation focusing on criteria.
-    # For simplicity, using the provided history.
-    for msg in messages_history: # Use the full provided history for now
+    for msg in messages_history: # Use the full provided history
         if msg["role"] in ["user", "assistant"]: # Only include user and assistant messages for context
              extraction_prompt_messages.append({"role": msg["role"], "content": msg["content"]})
 
@@ -638,14 +651,16 @@ async def chat(chat_request: ChatRequest, request: Request):
                     if final_max_price is not None: search_criteria_summary += f", max price: {parsed_price_for_summary}"
                     
                     no_results_prompt_for_ai = (
-                        f"A property search was performed using criteria interpreted from the user's input. "
-                        f"The key criterion for price in this search was a maximum of {parsed_price_for_summary}. "
-                        f"The full search criteria were: {{{search_criteria_summary}}}. "
-                        f"This search (for max price {parsed_price_for_summary} and other criteria) yielded no direct listings. "
-                        f"Follow these steps in your response: "
-                        f"1. Inform the user that no listings were found for their request when interpreted with a maximum price of {parsed_price_for_summary} and the other specified criteria. Be empathetic. "
-                        f"2. Retrieve the user's *exact original phrasing for the price* from their last message in the conversation history. If this original phrasing seems like it could have reasonably meant a *different* monetary amount than {parsed_price_for_summary} (e.g., due to unusual comma placement or typos), then briefly state their original phrasing (e.g., 'Your input for price was \"[user's original price text]\".') and ask them to clarify their intended budget. Do NOT speculate on what they might have meant beyond asking for this clarification. "
-                        f"3. Then, suggest ways to broaden the search based on the *actually searched criteria* (e.g., adjusting the price from {parsed_price_for_summary}, changing the number of bedrooms/bathrooms, property type, or location details)."
+                        f"IMPORTANT: A specific property database search was just attempted using the following criteria: {{{search_criteria_summary}}}. "
+                        f"This search yielded zero listings. Your task now is to help the user refine these criteria. "
+                        f"DO NOT state that you don't have access to listings or that you cannot perform searches. A search was just done. "
+                        f"Follow these steps precisely:
+"
+                        f"1. Empathetically inform the user that the specific search for {{{search_criteria_summary}}} did not find any exact matches in the current database. "
+                        f"2. If the user's original phrasing for any part of the criteria (especially price or location) seemed ambiguous compared to how it was interpreted for the search (details in {{{search_criteria_summary}}}), briefly mention their original phrasing (e.g., 'Your input for price was \"[user's original text]\".') and ask for clarification on their intended meaning for that part of the criteria. Only do this if there was clear potential for misinterpretation reflected in the summary. "
+                        f"3. Proactively suggest specific ways the user could modify THIS FAILED SEARCH ({{{search_criteria_summary}}}) to get results. For example, suggest adjusting the price ({parsed_price_for_summary}), changing the number of bedrooms/bathrooms, considering a different property type, or adjusting location details. "
+                        f"4. Ask the user if they would like to try modifying any of these specific criteria for a new search, or if they want to try a completely different search. "
+                        f"Your entire response should focus on these steps to iterate on the failed search."
                     )
                     messages_for_openai.append({"role": "system", "content": no_results_prompt_for_ai})
             
