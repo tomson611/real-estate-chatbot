@@ -650,18 +650,16 @@ async def chat(chat_request: ChatRequest, request: Request):
                     parsed_price_for_summary = f"${final_max_price:,.0f}" if final_max_price is not None else "not specified"
                     if final_max_price is not None: search_criteria_summary += f", max price: {parsed_price_for_summary}"
                     
-                    no_results_prompt_for_ai = (
-                        f"IMPORTANT: A specific property database search was just attempted using the following criteria: {{{search_criteria_summary}}}. "
-                        f"This search yielded zero listings. Your task now is to help the user refine these criteria. "
-                        f"DO NOT state that you don't have access to listings or that you cannot perform searches. A search was just done. "
-                        f"Follow these steps precisely:
-"
-                        f"1. Empathetically inform the user that the specific search for {{{search_criteria_summary}}} did not find any exact matches in the current database. "
-                        f"2. If the user's original phrasing for any part of the criteria (especially price or location) seemed ambiguous compared to how it was interpreted for the search (details in {{{search_criteria_summary}}}), briefly mention their original phrasing (e.g., 'Your input for price was \"[user's original text]\".') and ask for clarification on their intended meaning for that part of the criteria. Only do this if there was clear potential for misinterpretation reflected in the summary. "
-                        f"3. Proactively suggest specific ways the user could modify THIS FAILED SEARCH ({{{search_criteria_summary}}}) to get results. For example, suggest adjusting the price ({parsed_price_for_summary}), changing the number of bedrooms/bathrooms, considering a different property type, or adjusting location details. "
-                        f"4. Ask the user if they would like to try modifying any of these specific criteria for a new search, or if they want to try a completely different search. "
-                        f"Your entire response should focus on these steps to iterate on the failed search."
-                    )
+                    no_results_prompt_for_ai = f"""IMPORTANT: A specific property database search was just attempted using the following criteria: {{{search_criteria_summary}}}. 
+This search yielded zero listings. Your task now is to help the user refine these criteria. 
+DO NOT state that you don't have access to listings or that you cannot perform searches. A search was just done. 
+Follow these steps precisely:
+
+1. Empathetically inform the user that the specific search for {{{search_criteria_summary}}} did not find any exact matches in the current database. 
+2. If the user's original phrasing for any part of the criteria (especially price or location) seemed ambiguous compared to how it was interpreted for the search (details in {{{search_criteria_summary}}}), briefly mention their original phrasing (e.g., 'Your input for price was "[user's original price text]".') and ask for clarification on their intended meaning for that part of the criteria. Only do this if there was clear potential for misinterpretation reflected in the summary. 
+3. Proactively suggest specific ways the user could modify THIS FAILED SEARCH ({{{search_criteria_summary}}}) to get results. For example, suggest adjusting the price ({parsed_price_for_summary}), changing the number of bedrooms/bathrooms, considering a different property type, or adjusting location details. 
+4. Ask the user if they would like to try modifying any of these specific criteria for a new search, or if they want to try a completely different search. 
+Your entire response should focus on these steps to iterate on the failed search."""
                     messages_for_openai.append({"role": "system", "content": no_results_prompt_for_ai})
             
             except HTTPException as e: # RentCast API specific error
