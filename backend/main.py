@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 import os
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import AsyncOpenAI
 import requests
 import json
 from datetime import datetime, timedelta
@@ -53,7 +53,7 @@ except redis.exceptions.ConnectionError as e:
     print(f"Failed to connect to Redis: {e}")
 
 # Initialize OpenAI
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 RENTCAST_API_KEY = os.getenv("RENTCAST_API_KEY")
 print(f"RentCast API key loaded: {'Yes' if RENTCAST_API_KEY else 'No'}")
 
