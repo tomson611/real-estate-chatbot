@@ -417,7 +417,7 @@ def map_property_type_to_rentcast(pt_string: Optional[str]) -> Optional[str]:
 async def extract_search_parameters_with_ai(messages_history: List[Dict[str, str]]) -> Dict[str, Any]:
     print("Attempting to extract search parameters with AI...")
     # Prepare a concise history, focusing on user and assistant messages
-    extraction_prompt_messages = [{"role": "system", "content": "You are a parameter extraction assistant. Given the conversation history, identify the user's desired search criteria for real estate. Extract: location (city and state if possible, e.g., 'Los Angeles, CA'), property_type (e.g., 'house', 'condo'), min_bedrooms (integer), min_bathrooms (float, e.g., 1.5), and max_price (float). Respond ONLY with a JSON object containing these fields. If a field is not mentioned, omit it or set its value to null. Example: {\\"location\\": \\"Los Angeles, CA\\", \\"property_type\\": \\"condo\\", \\"min_bedrooms\\": 2, \\"max_price\\": 1000000}"}]
+    extraction_prompt_messages = [{"role": "system", "content": """You are a parameter extraction assistant. Given the conversation history, identify the user's desired search criteria for real estate. Extract: location (city and state if possible, e.g., 'Los Angeles, CA'), property_type (e.g., 'house', 'condo'), min_bedrooms (integer), min_bathrooms (float, e.g., 1.5), and max_price (float). Respond ONLY with a JSON object containing these fields. If a field is not mentioned, omit it or set its value to null. Example: {\"location\": \"Los Angeles, CA\", \"property_type\": \"condo\", \"min_bedrooms\": 2, \"max_price\": 1000000}"""}]
 
     # Add relevant parts of the conversation history for the AI to parse
     # This can be optimized, but for now, let's use the last few messages
