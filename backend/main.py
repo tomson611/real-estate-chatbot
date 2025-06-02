@@ -693,31 +693,80 @@ async def chat(chat_request: ChatRequest, request: Request):
                 return {"response": {"text": "I encountered an error while searching for properties. Please try again later.", "properties": []}}
 
         # Fallback to general OpenAI completion if not a property search
-        messages = [
-            {"role": "system", "content": SYSTEM_MESSAGE},
-            *[{"role": msg.role, "content": msg.content} for msg in chat_request.messages]
-        ]
-        print(f"Falling back to OpenAI. is_valid_location_string: {is_valid_location_string}, is_property_search: {is_property_search}") # Added print for clarity
-        openai_response = client.chat.completions.create(
+        print(f"Final check before OpenAI call: Location='{final_search_location}', PropertyType='{property_type}', MinBathrooms='{min_bathrooms}', MaxPrice='{max_price}', IsPropertySearch={is_property_search}")
+
+        messages_for_openai = [{"role": "system", "content": SYSTEM_MESSAGE}] + \
+                              [{"role": msg.role, "content": msg.content} for msg in chat_request.messages]
+
+        properties_result = [] # Initialize
+        
+        # If it's a property search and we have a location, call RentCast
+        if is_property_search and final_search_location:
+            print(f"Calling RentCast for: Loc='{final_search_location}', PT='{property_type}', Baths='{min_bathrooms}', Price='{max_price}'")
+            try:
+                properties_result = get_rentcast_data(
+                    location=final_search_location,
+                    max_price=max_price,
+                    property_type=property_type,
+                    min_bathrooms=min_bathrooms
+                )
+                print(f"RentCast returned {len(properties_result)} properties.")
+                if not properties_result: # Explicitly check for empty list
+                    print("RentCast returned no properties. Will inform OpenAI.")
+                    # Add a specific system-like message to guide OpenAI for "no results"
+                    no_results_prompt = f"The property search for {{location: '{final_search_location}', max_price: '{max_price}', property_type: '{property_type}', min_bathrooms: '{min_bathrooms}'}} yielded no results. Please inform the user and suggest they try broadening their search criteria, such as adjusting the price range, number of bathrooms, property type, or searching in a nearby area. Be empathetic and helpful."
+                    messages_for_openai.append({"role": "system", "content": no_results_prompt})
+                    # No need to pass properties_result to OpenAI if it's empty and handled by this prompt
+                
+            except HTTPException as e:
+                print(f"HTTPException from RentCast: {e.detail}")
+                # Let OpenAI handle this as a general error or a situation where it can't fetch listings
+                error_prompt = "I encountered an issue trying to fetch property listings. Please try again or ask a different question."
+                messages_for_openai.append({"role": "system", "content": error_prompt})
+                properties_result = [] # Ensure properties_result is empty
+
+            except Exception as e: # Catch any other unexpected errors from RentCast
+                print(f"Unexpected error from RentCast: {str(e)}")
+                error_prompt = "I encountered an unexpected issue while trying to fetch property listings. Please try again."
+                messages_for_openai.append({"role": "system", "content": error_prompt})
+                properties_result = []
+
+
+        # If properties_result is not empty, OpenAI doesn't need to generate text about them,
+        # it just needs to provide a contextual message if any.
+        # The properties will be sent to the frontend for display.
+        # If properties_result IS empty (either no search, or search yielded no results and we added a prompt),
+        # then OpenAI will generate the main text response.
+        
+        if properties_result:
+             # If we have properties, the AI's main role is to provide a brief intro/summary.
+             # The actual property data is sent separately.
+             # We might want to slightly adjust the prompt or system message for this case too,
+             # to ensure it doesn't try to re-list properties in text.
+             # For now, the SYSTEM_MESSAGE has "DO NOT provide a text summary of the listings"
+             # which should cover this.
+            print("OpenAI will be called, but properties_result will be sent directly to frontend.")
+            pass # OpenAI call will proceed with existing messages_for_openai
+
+        print(f"Messages for OpenAI ({len(messages_for_openai)} total):")
+        for i, msg in enumerate(messages_for_openai):
+            print(f"  [{i}] Role: {msg['role']}, Content: {msg['content'][:200]}...") # Print first 200 chars
+
+        ai_response = client.chat.completions.create(
             model=OPENAI_MODEL,
-            messages=messages,
-            temperature=0.7
+            messages=messages_for_openai,
+            temperature=0.3, # Slightly lower temperature for more factual/less creative property responses
+            max_tokens=500
         )
-        response_text = openai_response.choices[0].message.content
         
-        # Text cleaning and normalization
-        response_text = re.sub(r'<[^>]+>', '', response_text) # Strip HTML tags
-        response_text = re.sub(r'^\s*\{\s*"text"\s*:\s*"', '', response_text) # Strip JSON-like prefix
-        response_text = re.sub(r'"\s*\}\s*$', '', response_text) # Strip JSON-like suffix
-        
-        # Remove malformed list items like "0. 0" or "1." on their own lines
-        response_text = re.sub(r"^\s*\d+\.\s*(\d+\s*)?$", "", response_text, flags=re.MULTILINE)
-        
-        response_text = re.sub(r'\n\n+', r'\n\n', response_text) # Normalize multiple newlines to double newlines
-        response_text = re.sub(r' +', ' ', response_text) # Collapse multiple spaces to a single space
-        response_text = response_text.strip() # Remove leading/trailing whitespace from the entire response
-        
-        return {"response": {"text": response_text}}
+        response_text = ai_response.choices[0].message.content.strip()
+        print(f"OpenAI Raw Response Text: {response_text}")
+
+        # Ensure proper markdown for lists is converted to HTML for the frontend later
+        # (The frontend already has some markdown conversion, but ensuring good input helps)
+        # response_text = response_text.replace("\n- ", "\n<br>- ") # Example, might need more robust markdown handling
+
+        return {"response": {"text": response_text, "properties": properties_result if properties_result else []}}
 
     except Exception as e:
         print(f"Error in chat endpoint: {str(e)}")
