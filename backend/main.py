@@ -568,7 +568,9 @@ async def chat(chat_request: ChatRequest, request: Request):
             if potential_locations:
                 cleaned_locations = []
                 non_location_phrases = ["show me", "can you show me", "find me", "search for", "looking for", "i want", "i need", "tell me about", "what about"]
+                confirmation_fluff = ["sure", "ok", "yes", "yeah", "yep", "alright", "got it", "sounds good", "perfect", "great", "correct"]
                 non_location_phrases.extend(known_property_keywords_map.keys())
+                non_location_phrases.extend(confirmation_fluff)
                 
                 for ploc in potential_locations:
                     temp_ploc_lower = ploc.lower()
