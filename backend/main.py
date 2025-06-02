@@ -558,7 +558,7 @@ async def chat(chat_request: ChatRequest, request: Request):
                     is_property_search_intent = False # Let main AI ask for location
             else: # Fallback to regex if not a clear go-ahead scenario (or for simple one-liners)
                 print("Not a clear go-ahead scenario after assistant summary. Trying regex extraction from last user message.")
-                # Basic regex extraction from the LAST user message only as a fallback.
+                # Simple regex extraction from the LAST user message only as a fallback.
                 # This part can be simplified or made less aggressive than the original complex regex block.
                 # For now, let's extract very obvious parameters if present.
                 
@@ -587,11 +587,20 @@ async def chat(chat_request: ChatRequest, request: Request):
                     search_params["property_type"] = map_property_type_to_rentcast(pt_str_match.group(1))
 
                 if search_params.get("location"): # Location is key for this path
-                    is_property_search_intent = True
-                    print(f"Regex Extracted Parameters from last user message: {search_params}")
+                    # Stricter condition: require location, property_type, min_bathrooms, AND max_price for a direct regex-based search.
+                    # Otherwise, let the main AI ask for more details according to SYSTEM_MESSAGE.
+                    if (search_params.get("property_type") and 
+                        search_params.get("min_bathrooms") and 
+                        search_params.get("max_price")):
+                        is_property_search_intent = True
+                        print(f"Regex Extracted Parameters (sufficient for direct search: Loc, Type, Baths, Price) from last user message: {search_params}")
+                    else:
+                        is_property_search_intent = False # Not enough for a direct Rentcast call from simple regex
+                        print(f"Regex Extracted Parameters (insufficient for direct search - need Loc, Type, Baths, Price) from last user message: {search_params}. Letting AI handle conversation flow.")
                 else:
                     # If regex didn't find a location in the last message, it's likely a general query or needs more context.
                     print("Regex extraction from last user message did not find a location.")
+                    is_property_search_intent = False # Ensure it's false if no location
 
 
         # --- Prepare for RentCast API call or OpenAI response ---
