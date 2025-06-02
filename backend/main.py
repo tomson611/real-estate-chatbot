@@ -30,12 +30,27 @@ app.add_middleware(
 )
 
 # Initialize Redis
-redis_client = redis.Redis(
-    host=os.getenv("REDIS_HOST", "localhost"),
-    port=int(os.getenv("REDIS_PORT", 6379)),
-    db=0,
-    decode_responses=False  # Keep as bytes for pickle serialization
-)
+redis_url = os.getenv("REDIS_URL")
+if redis_url:
+    print(f"Connecting to Redis using REDIS_URL: {redis_url}")
+    redis_client = redis.from_url(redis_url, decode_responses=False)
+else:
+    print("REDIS_URL not found, connecting to Redis using localhost defaults.")
+    redis_client = redis.Redis(
+        host=os.getenv("REDIS_HOST", "localhost"),
+        port=int(os.getenv("REDIS_PORT", 6379)),
+        db=0,
+        decode_responses=False  # Keep as bytes for pickle serialization
+    )
+
+# Test Redis connection
+try:
+    if redis_client.ping():
+        print("Successfully connected to Redis!")
+    else:
+        print("Redis ping failed.")
+except redis.exceptions.ConnectionError as e:
+    print(f"Failed to connect to Redis: {e}")
 
 # Initialize OpenAI
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -464,7 +479,7 @@ async def chat(chat_request: ChatRequest, request: Request):
         last_user_message_content = last_user_message_obj.content.strip().lower()
 
         # --- Mortgage Calculation Logic (keep as is) ---
-        mortgage_pattern = r"(?:purchase price|loan amount)?\\s*\\$?(\\d+(?:,\\d{3})*(?:\\.\\d{2})?)\\s*(?:interest rate|rate)\\s*(\\d+(?:\\.\\d+)?)\\%?\\s*(?:loan|for)\\s*(\\d+)\\s*(?:years?|yrs?)?"
+        mortgage_pattern = r"(?:purchase price|loan amount)?\s*\$?([0-9]+(?:,[0-9]{3})*(?:\.[0-9]{2})?)\s*(?:interest rate|rate)\s*([0-9]+(?:\.[0-9]+)?)\%?\s*(?:loan|for)\s*([0-9]+)\s*(?:years?|yrs?)?"
         mortgage_match = re.search(mortgage_pattern, last_user_message_content)
         if mortgage_match:
             # ... (mortgage calculation logic remains unchanged) ...
@@ -476,15 +491,15 @@ async def chat(chat_request: ChatRequest, request: Request):
                 if loan_amount and interest_rate and loan_term:
                     result = calculate_mortgage_payment(loan_amount, interest_rate, loan_term)
                     response_text = (
-                        f"Based on your inputs:\\\\n"
-                        f"Loan Amount: ${loan_amount:,.2f}\\\\n"
-                        f"Interest Rate: {interest_rate}%\\\\n"
-                        f"Loan Term: {loan_term} years\\\\n"
-                        f"Down Payment: $0.00\\\\n\\\\n"
-                        f"Your estimated monthly payment would be: ${result['monthly_payment']:,.2f}\\\\n\\\\n"
-                        f"Additional details:\\\\n"
-                        f"Total payment over loan term: ${result['total_payment']:,.2f}\\\\n"
-                        f"Total interest paid: ${result['total_interest']:,.2f}\\\\n\\\\n"
+                        f"Based on your inputs:\\n"
+                        f"Loan Amount: ${loan_amount:,.2f}\\n"
+                        f"Interest Rate: {interest_rate}%\\n"
+                        f"Loan Term: {loan_term} years\\n"
+                        f"Down Payment: $0.00\\n\\n"
+                        f"Your estimated monthly payment would be: ${result['monthly_payment']:,.2f}\\n\\n"
+                        f"Additional details:\\n"
+                        f"Total payment over loan term: ${result['total_payment']:,.2f}\\n"
+                        f"Total interest paid: ${result['total_interest']:,.2f}\\n\\n"
                         f"Note: This calculation does not include property taxes, homeowners insurance, or PMI if applicable."
                     )
                     response_text = re.sub(r'<[^>]+>', '', response_text)
