@@ -52,6 +52,7 @@ venv/
 ENV/
 env/
 backend/venv_py311/
+.pytest_cache/
 
 # System Files
 .DS_Store
