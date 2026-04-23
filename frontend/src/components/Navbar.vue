@@ -1,3 +1,23 @@
+<template>
+  <nav class="navbar">
+    <div class="navbar-container">
+      <RouterLink to="/" class="navbar-brand">
+        <span class="brand-icon">🏠</span>
+        <span class="brand-name">Real Estate AI</span>
+      </RouterLink>
+      <div class="navbar-links">
+        <RouterLink to="/" exact-active-class="active" active-class="">Home</RouterLink>
+        <RouterLink to="/chat" active-class="active">Chat</RouterLink>
+      </div>
+    </div>
+  </nav>
+</template>
+
+<script setup>
+import { RouterLink } from 'vue-router'
+</script>
+
+<style scoped>
 .navbar {
   background-color: white;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -66,22 +86,6 @@
   border-bottom: 2px solid #3498db;
 }
 
-.get-started-btn {
-  background-color: #3498db;
-  color: white;
-  border: none;
-  padding: 0.5rem 1rem;
-  border-radius: 0.5rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-  text-decoration: none;
-}
-
-.get-started-btn:hover {
-  background-color: #2980b9;
-}
-
 @media (max-width: 768px) {
   .navbar-container {
     padding: 0 1rem;
@@ -94,4 +98,5 @@
   .brand-name {
     display: none;
   }
-} 
+}
+</style>
