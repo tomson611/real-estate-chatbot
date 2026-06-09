@@ -1,6 +1,6 @@
 # Real Estate Chatbot
 
-A real estate chatbot that integrates with RentCast API and uses OpenAI's GPT for natural language processing. Built with Angular frontend and FastAPI backend.
+A real estate chatbot that integrates with RentCast API and uses OpenAI's GPT for natural language processing. Built with Vue.js frontend and FastAPI backend.
 
 ## Prerequisites
 
